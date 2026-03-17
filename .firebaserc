@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "pickleball-tracker-480a7",
+    "dev": "pickleball-tracker-dev"
+  },
+  "targets": {},
+  "etags": {}
+}

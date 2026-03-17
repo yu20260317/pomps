@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomps Pond Tracker V3.10</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; transition: background-color 0.5s; }
+        .counter-box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 320px; max-width: 400px; }
+        h1 { font-size: 4rem; margin: 10px 0; color: #2c3e50; }
+        button { font-size: 1.2rem; padding: 12px 25px; margin: 10px; cursor: pointer; border: none; border-radius: 10px; transition: all 0.2s; }
+        button:disabled { background-color: #bdc3c7 !important; cursor: not-allowed; opacity: 0.7; }
+        .plus { background-color: #27ae60; color: white; width: 100%; }
+        .minus { background-color: #e74c3c; color: white; }
+        #loyaltyBadge { font-size: 0.9rem; color: #e67e22; font-weight: bold; margin-bottom: 10px; display: none; }
+        #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 20px; }
+        #announcementBar { background: #ecf0f1; color: #2c3e50; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none; border: 1px solid #dcdde1; text-align: left; }
+        #adminArea { display: none; margin-top: 30px; padding: 15px; border: 2px dashed #3498db; border-radius: 15px; background: rgba(255, 255, 255, 0.5); }
+    </style>
+</head>
+<body>
+
+    <div id="announcementBar"></div>
+
+    <div class="counter-box">
+        <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
+        <div id="loyaltyBadge"></div>
+        <h1 id="count">...</h1>
+        
+        <div id="checkInArea">
+            <button id="plusBtn" class="plus" onclick="handleUpdate(1)">+ I'm Here</button>
+        </div>
+        
+        <div id="alreadyInArea" style="display: none;">
+            <p style="color: #27ae60; font-weight: bold;">✅ You are checked in</p>
+            <button id="minusBtn" class="minus" onclick="handleUpdate(-1)">- I'm Leaving</button>
+        </div>
+
+        <div id="status">Connecting to the Pond...</div>
+
+        <div id="adminArea">
+            <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
+            <div style="margin-bottom: 15px;">
+                <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 </button>
+                <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1 </button>
+            </div>
+            <input type="text" id="msgInput" placeholder="Announcement..." style="width:80%; padding:8px; margin-bottom:10px;">
+            <br>
+            <button onclick="sendAnnouncement()" style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
+            <button onclick="clearAnnouncement()" style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
+            <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; pt: 5px;">
+                System: Last Daily Wipe at ...
+            </p>
+        </div>
+
+        <p id="debugId" style="font-size: 0.65rem; color: #bdc3c7; margin-top: 40px; font-family: monospace;"></p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+	const app = initializeApp({
+  		apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
+  		authDomain: "pickleball-tracker-dev.firebaseapp.com",
+  		projectId: "pickleball-tracker-dev",
+  		storageBucket: "pickleball-tracker-dev.firebasestorage.app",
+  		messagingSenderId: "561468524719",
+  		appId: "1:561468524719:web:cafd771b3333f88801ac5a",
+  		measurementId: "G-RGCH777LTC"
+		});
+        const db = getFirestore(app);
+        const docRef = doc(db, "counts", "court_1");
+        const EXPIRY_TIME = 1000 * 60 * 60 * 2;
+
+        // --- 1. THE SENTINEL (Daily Reset) ---
+        const checkAndReset = async () => {
+            const today = new Date().toDateString();
+            
+            // --- ADD THIS LINE BELOW ---
+            const nowTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            try {
+                await runTransaction(db, async (t) => {
+                    const courtSnap = await t.get(docRef);
+                    const data = courtSnap.data();
+                    if (data.last_reset_day !== today) {
+                        t.update(docRef, {
+                            player_count: 0,
+                            last_reset_day: today,
+                            last_reset_time: nowTimestamp // Now this variable exists!
+                        });
+
+                        // This part is perfect
+                        const allTickets = await getDocs(collection(db, "tickets"));
+                        allTickets.forEach(d => t.delete(d.ref));
+                                                
+                        console.log(`🌅 Sunrise Reset at ${nowTimestamp}`);
+                    }
+                });
+            } catch (e) { console.error("Reset check failed: ", e); }
+        };
+        checkAndReset();
+
+        // --- 2. THE BOUNCER (Ghost Player Cleanup) ---
+        const kickOutGhosts = async () => {
+            try {
+                const expiredTime = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
+                const q = query(collection(db, "tickets"), where("createdAt", "<", expiredTime));
+                const snap = await getDocs(q);
+                
+                if (!snap.empty) {
+                    await runTransaction(db, async (t) => {
+                        const countSnap = await t.get(docRef);
+                        snap.forEach(d => t.delete(d.ref));
+                        const newCount = Math.max(0, (countSnap.data().player_count || 0) - snap.size);
+                        t.update(docRef, { player_count: newCount });
+                    });
+                    console.log(`Bouncer kicked out ${snap.size} ghost(s).`);
+                }
+            } catch(e) { console.error("Bouncer failed: ", e); }
+        };
+        kickOutGhosts();
+
+        // --- UI & LOGIC ---
+        if (new URLSearchParams(window.location.search).get('role') === 'pro') {
+            document.getElementById('adminArea').style.display = 'block';
+            document.body.style.backgroundColor = "#e1f5fe";
+        }
+
+        let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('pickleball_player_id', myPlayerId);
+        let visitCount = parseInt(localStorage.getItem('pickleball_visits') || '0');
+        // --- WEEKLY REGULAR RESET ---
+        const lastResetWeek = localStorage.getItem('pickleball_last_reset_week');
+        const now = new Date();
+
+        // Get the ISO week number (or just a unique string for this week)
+        const currentWeek = `${now.getFullYear()}-W${Math.ceil((((now - new Date(now.getFullYear(), 0, 1)) / 8.64e7) + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
+
+        if (lastResetWeek !== currentWeek) {
+            // If it's a new week, reset the counter!
+            visitCount = 0;
+            localStorage.setItem('pickleball_visits', '0');
+            localStorage.setItem('pickleball_last_reset_week', currentWeek);
+            console.log("♻️ Weekly Visit Count Reset!");
+        }
+        
+        window.proAdjust = (val) => updateDoc(docRef, { player_count: increment(val) });
+
+        window.handleUpdate = async (val) => {
+            const plusBtn = document.getElementById('plusBtn');
+            if(plusBtn) plusBtn.disabled = true;
+
+            try {
+                if (val === 1) {
+                    await addDoc(collection(db, "tickets"), { createdAt: Timestamp.now(), playerId: myPlayerId });
+                    await updateDoc(docRef, { player_count: increment(1) });
+                    localStorage.setItem('pickleball_checkin_time', Date.now().toString());
+                    
+                    visitCount++;
+                    localStorage.setItem('pickleball_visits', visitCount.toString());
+                } else {
+                    const loginTime = localStorage.getItem('pickleball_checkin_time');
+                    if (loginTime) {
+                        const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
+                        alert(`Great games! Your session lasted ${mins} minutes.`);
+                    }
+
+                    const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId));
+                    const snap = await getDocs(q);
+                    await runTransaction(db, async (t) => {
+                        const countSnap = await t.get(docRef);
+                        snap.forEach(d => t.delete(d.ref));
+                        t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - snap.size) });
+                    });
+                    localStorage.removeItem('pickleball_checkin_time');
+                }
+                await updateUIVisibility();
+            } catch (e) { console.error(e); }
+            setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
+        };
+
+        function getStatus(visits) {
+            if (visits >= 9) return "🎯 3rd Shot Master";
+            if (visits >= 7) return "🐉 Pond Legend";
+            if (visits >= 5) return "👑 Kitchen Royalty";
+            if (visits >= 3) return "🎾 Baseline Boss";
+            if (visits >= 1) return "🛶 Pond Paddler";
+            return "";
+        }
+        
+        async function updateUIVisibility() {
+            const statusEl = document.getElementById('status');
+            const badge = document.getElementById('loyaltyBadge');
+            
+            // 1. Look for YOUR ticket in the database
+            const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId));
+            const snap = await getDocs(q);
+            
+            // 2. If the database has a ticket for you, you are checked in!
+            const isActuallyCheckedIn = !snap.empty;
+
+            document.getElementById('alreadyInArea').style.display = isActuallyCheckedIn ? 'block' : 'none';
+            document.getElementById('checkInArea').style.display = isActuallyCheckedIn ? 'none' : 'block';
+            
+            // 3. Keep the Loyalty Badge logic (this is fine in LocalStorage)
+            const statusText = getStatus(visitCount);
+            if (statusText) {
+                badge.innerText = `${statusText} (Weekly Visit ${visitCount})`;
+                badge.style.display = 'block';
+            }
+        }
+
+
+        onSnapshot(docRef, (snap) => {
+            const statusEl = document.getElementById('status');
+            if (snap.exists()) {
+                const data = snap.data();
+                document.getElementById('count').innerText = Math.max(0, data.player_count || 0);
+                
+                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                statusEl.innerText = `Live Sync Active • Last update: ${now}`;
+
+                const bar = document.getElementById('announcementBar');
+                bar.style.display = data.announcement ? 'block' : 'none';
+                if (data.announcement) bar.innerHTML = `<div>💬 ${data.announcement}</div>`;
+                
+                
+               const resetEl = document.getElementById('resetStatus');
+               if (resetEl && data.last_reset_time) {
+                    resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
+                }
+            }
+        });
+
+        window.sendAnnouncement = () => {
+            const msg = document.getElementById('msgInput').value;
+            if (msg) updateDoc(docRef, { announcement: msg });
+            document.getElementById('msgInput').value = "";
+        };
+        window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
+
+        // Update the call at the very bottom of your script to handle the "async" nature
+        updateUIVisibility().catch(console.error);
+    </script>
+</body>
+</html>

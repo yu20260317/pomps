@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow anyone to read/write to the counts and tickets collections
+    match /counts/{document=**} {
+      allow read, write: if true;
+    }
+    match /tickets/{document=**} {
+      allow read, write, delete: if true; // <--- The Janitor needs 'delete'!
+    }
+  }
+}
