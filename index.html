@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomps Pond Tracker V3.10</title>
+    <title>Pomps Pond Tracker V3.11</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; transition: background-color 0.5s; }
         .counter-box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; min-width: 320px; max-width: 400px; }
@@ -51,23 +51,24 @@
             <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; pt: 5px;">
                 System: Last Daily Wipe at ...
             </p>
+            <p id="debugId" style="font-size: 0.65rem; color: #bdc3c7; margin-top: 15px; font-family: monospace; display: none;"></p>
         </div>
-
-        <p id="debugId" style="font-size: 0.65rem; color: #bdc3c7; margin-top: 40px; font-family: monospace;"></p>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-	const app = initializeApp({
-  		apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
-  		authDomain: "pickleball-tracker-dev.firebaseapp.com",
-  		projectId: "pickleball-tracker-dev",
-  		storageBucket: "pickleball-tracker-dev.firebasestorage.app",
-  		messagingSenderId: "561468524719",
-  		appId: "1:561468524719:web:cafd771b3333f88801ac5a",
-  		measurementId: "G-RGCH777LTC"
-		});
+        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const app = initializeApp({
+            apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
+            authDomain: "pickleball-tracker-dev.firebaseapp.com",
+            projectId: "pickleball-tracker-dev",
+            storageBucket: "pickleball-tracker-dev.firebasestorage.app",
+            messagingSenderId: "561468524719",
+            appId: "1:561468524719:web:cafd771b3333f88801ac5a",
+            measurementId: "G-RGCH777LTC"
+        });
+
         const db = getFirestore(app);
         const docRef = doc(db, "counts", "court_1");
         const EXPIRY_TIME = 1000 * 60 * 60 * 2;
@@ -75,8 +76,6 @@
         // --- 1. THE SENTINEL (Daily Reset) ---
         const checkAndReset = async () => {
             const today = new Date().toDateString();
-            
-            // --- ADD THIS LINE BELOW ---
             const nowTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             
             try {
@@ -87,13 +86,10 @@
                         t.update(docRef, {
                             player_count: 0,
                             last_reset_day: today,
-                            last_reset_time: nowTimestamp // Now this variable exists!
+                            last_reset_time: nowTimestamp
                         });
-
-                        // This part is perfect
                         const allTickets = await getDocs(collection(db, "tickets"));
                         allTickets.forEach(d => t.delete(d.ref));
-                                                
                         console.log(`🌅 Sunrise Reset at ${nowTimestamp}`);
                     }
                 });
@@ -122,41 +118,91 @@
         kickOutGhosts();
 
         // --- UI & LOGIC ---
+        let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('pickleball_player_id', myPlayerId);
+
         if (new URLSearchParams(window.location.search).get('role') === 'pro') {
             document.getElementById('adminArea').style.display = 'block';
             document.body.style.backgroundColor = "#e1f5fe";
+            const debugEl = document.getElementById('debugId');
+            debugEl.style.display = 'block';
+            debugEl.innerText = `Admin View | ID: ${myPlayerId.substring(0,8)}`;
         }
 
-        let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('pickleball_player_id', myPlayerId);
         let visitCount = parseInt(localStorage.getItem('pickleball_visits') || '0');
-        // --- WEEKLY REGULAR RESET ---
         const lastResetWeek = localStorage.getItem('pickleball_last_reset_week');
         const now = new Date();
-
-        // Get the ISO week number (or just a unique string for this week)
         const currentWeek = `${now.getFullYear()}-W${Math.ceil((((now - new Date(now.getFullYear(), 0, 1)) / 8.64e7) + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
 
         if (lastResetWeek !== currentWeek) {
-            // If it's a new week, reset the counter!
             visitCount = 0;
             localStorage.setItem('pickleball_visits', '0');
             localStorage.setItem('pickleball_last_reset_week', currentWeek);
-            console.log("♻️ Weekly Visit Count Reset!");
         }
         
-        window.proAdjust = (val) => updateDoc(docRef, { player_count: increment(val) });
+ 
+    window.proAdjust = async (val) => {
+        try {
+            if (val === 1) {
+                // Standard +1: Create a manual guest ticket
+                const guestId = "manager_guest_" + Math.random().toString(36).substr(2, 5);
+                await addDoc(collection(db, "tickets"), {
+                    createdAt: Timestamp.now(),
+                    playerId: guestId,
+                    status: "live",
+                    type: "play",
+                    isManual: true
+                });
+                await updateDoc(docRef, { player_count: increment(1) });
+                console.log("🎟️ Guest added.");
+            } else {
+                // Standard -1: The "Smart Undo" logic
+                // First, try to find the NEWEST manual ticket (to undo a mistake)
+                const manualQ = query(
+                    collection(db, "tickets"),
+                    where("isManual", "==", true),
+                    orderBy("createdAt", "desc"),
+                    limit(1)
+                );
+                const manualSnap = await getDocs(manualQ);
 
+                if (!manualSnap.empty) {
+                    // Undo the Manager's latest manual addition
+                    await runTransaction(db, async (t) => {
+                        t.delete(manualSnap.docs[0].ref);
+                        t.update(docRef, { player_count: increment(-1) });
+                    });
+                    console.log("↩️ Undo: Removed latest manual guest.");
+                } else {
+                    // If no manual tickets exist, hunt the oldest "Ghost"
+                    const ghostQ = query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1));
+                    const ghostSnap = await getDocs(ghostQ);
+                    if (!ghostSnap.empty) {
+                        await runTransaction(db, async (t) => {
+                            t.delete(ghostSnap.docs[0].ref);
+                            t.update(docRef, { player_count: increment(-1) });
+                        });
+                        console.log("🧹 Ghost Hunt: Removed oldest player.");
+                    }
+                }
+            }
+        } catch (e) { console.error("Pro Adjust failed:", e); }
+    };
+    
+    
         window.handleUpdate = async (val) => {
             const plusBtn = document.getElementById('plusBtn');
             if(plusBtn) plusBtn.disabled = true;
-
             try {
                 if (val === 1) {
-                    await addDoc(collection(db, "tickets"), { createdAt: Timestamp.now(), playerId: myPlayerId });
+                    await addDoc(collection(db, "tickets"), {
+                        createdAt: Timestamp.now(),
+                        playerId: myPlayerId,
+                        status: "live",
+                        type: "play"
+                    });
                     await updateDoc(docRef, { player_count: increment(1) });
                     localStorage.setItem('pickleball_checkin_time', Date.now().toString());
-                    
                     visitCount++;
                     localStorage.setItem('pickleball_visits', visitCount.toString());
                 } else {
@@ -165,7 +211,6 @@
                         const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
                         alert(`Great games! Your session lasted ${mins} minutes.`);
                     }
-
                     const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId));
                     const snap = await getDocs(q);
                     await runTransaction(db, async (t) => {
@@ -190,20 +235,12 @@
         }
         
         async function updateUIVisibility() {
-            const statusEl = document.getElementById('status');
             const badge = document.getElementById('loyaltyBadge');
-            
-            // 1. Look for YOUR ticket in the database
             const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId));
             const snap = await getDocs(q);
-            
-            // 2. If the database has a ticket for you, you are checked in!
             const isActuallyCheckedIn = !snap.empty;
-
             document.getElementById('alreadyInArea').style.display = isActuallyCheckedIn ? 'block' : 'none';
             document.getElementById('checkInArea').style.display = isActuallyCheckedIn ? 'none' : 'block';
-            
-            // 3. Keep the Loyalty Badge logic (this is fine in LocalStorage)
             const statusText = getStatus(visitCount);
             if (statusText) {
                 badge.innerText = `${statusText} (Weekly Visit ${visitCount})`;
@@ -211,23 +248,18 @@
             }
         }
 
-
         onSnapshot(docRef, (snap) => {
             const statusEl = document.getElementById('status');
             if (snap.exists()) {
                 const data = snap.data();
                 document.getElementById('count').innerText = Math.max(0, data.player_count || 0);
-                
-                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                statusEl.innerText = `Live Sync Active • Last update: ${now}`;
-
+                const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                statusEl.innerText = `Live Sync Active • Last update: ${nowStr}`;
                 const bar = document.getElementById('announcementBar');
                 bar.style.display = data.announcement ? 'block' : 'none';
                 if (data.announcement) bar.innerHTML = `<div>💬 ${data.announcement}</div>`;
-                
-                
-               const resetEl = document.getElementById('resetStatus');
-               if (resetEl && data.last_reset_time) {
+                const resetEl = document.getElementById('resetStatus');
+                if (resetEl && data.last_reset_time) {
                     resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
                 }
             }
@@ -240,8 +272,8 @@
         };
         window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
 
-        // Update the call at the very bottom of your script to handle the "async" nature
         updateUIVisibility().catch(console.error);
     </script>
 </body>
 </html>
+
