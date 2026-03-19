@@ -379,20 +379,6 @@
         }
     };
 
-        // 3. GHOST CLEANUP (Ongoing 2-hour expiry for Live players)
-        const expiredTime = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
-        const q = query(collection(db, "tickets"), where("createdAt", "<", expiredTime), where("status", "==", "live"));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-            await runTransaction(db, async (t) => {
-                const countSnap = await t.get(docRef);
-                snap.forEach(d => t.delete(d.ref));
-                const newCount = Math.max(0, (countSnap.data().player_count || 0) - snap.size);
-                t.update(docRef, { player_count: newCount });
-            });
-        }
-    };
-
     window.proAdjust = async (val) => {
         try {
             if (val === 1) {
