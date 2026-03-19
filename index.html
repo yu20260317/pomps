@@ -1,3 +1,6 @@
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -111,292 +114,314 @@
             <button id="commitBtn" class="plus" onclick="submitCommitment()" style="margin-top: 15px; background: #3498db;">
                 + I'll Be There
             </button>
+        <button id="withdrawBtn" onclick="withdrawCommitment()"
+                style="display:none; width: 100%; background:none; color:#e74c3c; font-size: 0.9rem; font-weight: bold; text-decoration: underline; border:none; margin-top: 15px; cursor: pointer;">
+            ❌ I can't make it anymore (Withdraw)
+        </button>
         </div>
     </div>
-
+    
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const app = initializeApp({
-            apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
-            authDomain: "pickleball-tracker-dev.firebaseapp.com",
-            projectId: "pickleball-tracker-dev",
-            storageBucket: "pickleball-tracker-dev.firebasestorage.app",
-            messagingSenderId: "561468524719",
-            appId: "1:561468524719:web:cafd771b3333f88801ac5a",
-            measurementId: "G-RGCH777LTC"
-        });
+    // --- 1. INITIALIZATION & CONFIG ---
+    const app = initializeApp({
+        apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
+        authDomain: "pickleball-tracker-dev.firebaseapp.com",
+        projectId: "pickleball-tracker-dev",
+        storageBucket: "pickleball-tracker-dev.firebasestorage.app",
+        messagingSenderId: "561468524719",
+        appId: "1:561468524719:web:cafd771b3333f88801ac5a",
+        measurementId: "G-RGCH777LTC"
+    });
 
-        const db = getFirestore(app);
-        const docRef = doc(db, "counts", "court_1");
-        const EXPIRY_TIME = 1000 * 60 * 60 * 2;
-        let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('pickleball_player_id', myPlayerId);
+    const db = getFirestore(app);
+    const docRef = doc(db, "counts", "court_1");
+    const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours
 
-        // --- UI NAVIGATION ---
-        window.showPage = (page) => {
-            document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
-            document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
-            document.getElementById('tabLive').classList.toggle('active', page === 'live');
-            document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
-        };
+    let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('pickleball_player_id', myPlayerId);
 
-        // --- FIREBASE MAINTENANCE ---
-        const checkAndReset = async () => {
-            const today = new Date().toDateString();
-            const nowTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            try {
-                await runTransaction(db, async (t) => {
-                    const courtSnap = await t.get(docRef);
-                    const data = courtSnap.data();
-                    if (data.last_reset_day !== today) {
-                        t.update(docRef, {
-                            player_count: 0,
-                            last_reset_day: today,
-                            last_reset_time: nowTimestamp
-                        });
-                        const allTickets = await getDocs(collection(db, "tickets"));
-                        allTickets.forEach(d => t.delete(d.ref));
-                        console.log(`🌅 Sunrise Reset at ${nowTimestamp}`);
-                    }
-                });
-            } catch (e) { console.error("Reset check failed: ", e); }
-        };
+    // Track current active commitment ID for withdrawal
+    let currentCommitId = null;
 
-        const kickOutGhosts = async () => {
-            try {
-                const expiredTime = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
-                const q = query(collection(db, "tickets"), where("createdAt", "<", expiredTime));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    await runTransaction(db, async (t) => {
-                        const countSnap = await t.get(docRef);
-                        snap.forEach(d => t.delete(d.ref));
-                        const newCount = Math.max(0, (countSnap.data().player_count || 0) - snap.size);
-                        t.update(docRef, { player_count: newCount });
-                    });
-                    console.log(`Bouncer kicked out ${snap.size} ghost(s).`);
-                }
-            } catch(e) { console.error("Bouncer failed: ", e); }
-        };
+    // --- 2. SHARED UI LOGIC ---
+    window.showPage = (page) => {
+        document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
+        document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
+        document.getElementById('tabLive').classList.toggle('active', page === 'live');
+        document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
+    };
 
-        // --- CORE LOGIC ---
-        let visitCount = parseInt(localStorage.getItem('pickleball_visits') || '0');
-        const lastResetWeek = localStorage.getItem('pickleball_last_reset_week');
-        const now = new Date();
-        const currentWeek = `${now.getFullYear()}-W${Math.ceil((((now - new Date(now.getFullYear(), 0, 1)) / 8.64e7) + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
+    async function updateGlobalVisibility() {
+        const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
+        document.getElementById('tabCommit').style.display = isDev ? 'block' : 'none';
         
-        if (lastResetWeek !== currentWeek) {
-            visitCount = 0;
-            localStorage.setItem('pickleball_visits', '0');
-            localStorage.setItem('pickleball_last_reset_week', currentWeek);
-        }
-
-        window.handleUpdate = async (val) => {
-            const plusBtn = document.getElementById('plusBtn');
-            if(plusBtn) plusBtn.disabled = true;
-            try {
-                if (val === 1) {
-                    await addDoc(collection(db, "tickets"), {
-                        createdAt: Timestamp.now(),
-                        playerId: myPlayerId,
-                        status: "live",
-                        type: "play"
-                    });
-                    await updateDoc(docRef, { player_count: increment(1) });
-                    localStorage.setItem('pickleball_checkin_time', Date.now().toString());
-                    visitCount++;
-                    localStorage.setItem('pickleball_visits', visitCount.toString());
-                } else {
-                    const loginTime = localStorage.getItem('pickleball_checkin_time');
-                    if (loginTime) {
-                        const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
-                        alert(`Great games! Your session lasted ${mins} minutes.`);
-                    }
-                    const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId));
-                    const snap = await getDocs(q);
-                    await runTransaction(db, async (t) => {
-                        const countSnap = await t.get(docRef);
-                        snap.forEach(d => t.delete(d.ref));
-                        t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - snap.size) });
-                    });
-                    localStorage.removeItem('pickleball_checkin_time');
-                }
-                await updateUIVisibility();
-            } catch (e) { console.error(e); }
-            setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
-        };
-
-        // --- UI UPDATES ---
-        async function updateUIVisibility() {
-            const badge = document.getElementById('loyaltyBadge');
-            const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
-            const snap = await getDocs(q);
-            const isActuallyCheckedIn = !snap.empty;
-
-            document.getElementById('alreadyInArea').style.display = isActuallyCheckedIn ? 'block' : 'none';
-            document.getElementById('checkInArea').style.display = isActuallyCheckedIn ? 'none' : 'block';
-
-            const statusText = getStatus(visitCount);
-            const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
-            
-            document.getElementById('tabCommit').style.display = isDev ? 'block' : 'none';
-            if (!isDev && document.getElementById('commitmentPage').style.display === 'block') {
-                showPage('live');
-            }
-
-            if (statusText) {
-                badge.innerText = `${statusText} (Weekly Visit ${visitCount})`;
-                badge.style.display = 'block';
-            }
-        }
-
-        function getStatus(visits) {
-            if (visits >= 9) return "🎯 3rd Shot Master";
-            if (visits >= 7) return "🐉 Pond Legend";
-            if (visits >= 5) return "👑 Kitchen Royalty";
-            if (visits >= 3) return "🎾 Baseline Boss";
-            if (visits >= 1) return "🛶 Pond Paddler";
-            return "";
-        }
-
-        // --- COMMITMENT LOGIC ---
-        let selectedTimeSlot = null;
-        window.selectSlot = (slotId) => {
-            document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
-            const target = document.getElementById(`slot-${slotId}`);
-            if (target) {
-                target.classList.add('selected');
-                selectedTimeSlot = slotId;
-                updateRoster(slotId);
-            }
-        };
-
-        window.updateRoster = (slotId) => {
-            const rosterEl = document.getElementById('playerList');
-            rosterEl.innerHTML = "<p style='color:#bdc3c7;'>Checking the Pond...</p>";
-            const q = query(
-                collection(db, "tickets"),
-                where("status", "==", "scheduled"),
-                where("timeSlot", "==", slotId)
-            );
-            onSnapshot(q, (snap) => {
-                if (snap.empty) {
-                    rosterEl.innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Nobody yet. Be the first!</p>";
-                    return;
-                }
-                let html = '<ul style="list-style:none; padding:0; margin:0;">';
-                snap.forEach(doc => {
-                    const data = doc.data();
-                    const isMe = data.playerId === myPlayerId ? " (You)" : "";
-                    html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🎾 <b>${data.displayName}</b>${isMe}</li>`;
-                });
-                html += '</ul>';
-                rosterEl.innerHTML = html;
-            });
-        };
-
-        window.submitCommitment = async () => {
-            const nameInput = document.getElementById('playerNickname');
-            const name = nameInput.value.trim() || "A Local Player";
-            if (!selectedTimeSlot) {
-                alert("Please 'dip your finger' on a time slot first! 🎾");
-                return;
-            }
-            const btn = document.getElementById('commitBtn');
-            btn.disabled = true;
-            btn.innerText = "Saving...";
-            try {
-                await addDoc(collection(db, "tickets"), {
-                    playerId: myPlayerId,
-                    displayName: name,
-                    timeSlot: selectedTimeSlot,
-                    status: "scheduled",
-                    createdAt: Timestamp.now(),
-                    date: new Date().toDateString()
-                });
-                localStorage.setItem('pickleball_nickname', name);
-                alert(`Booyah! ${name} is down for the ${selectedTimeSlot} slot.`);
-                selectedTimeSlot = null;
-                document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
-                document.getElementById('playerList').innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Tap a time slot to see the crew!</p>";
-            } catch (e) {
-                console.error(e);
-                alert("Commitment failed.");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "+ I'll Be There";
-            }
-        };
-
-        // --- ADMIN / PRO CONTROL ---
-        window.proAdjust = async (val) => {
-            try {
-                if (val === 1) {
-                    const guestId = "manager_guest_" + Math.random().toString(36).substr(2, 5);
-                    await addDoc(collection(db, "tickets"), {
-                        createdAt: Timestamp.now(), playerId: guestId, status: "live", type: "play", isManual: true
-                    });
-                    await updateDoc(docRef, { player_count: increment(1) });
-                } else {
-                    const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
-                    const manualSnap = await getDocs(manualQ);
-                    if (!manualSnap.empty) {
-                        await runTransaction(db, async (t) => {
-                            t.delete(manualSnap.docs[0].ref);
-                            t.update(docRef, { player_count: increment(-1) });
-                        });
-                    } else {
-                        const ghostQ = query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1));
-                        const ghostSnap = await getDocs(ghostQ);
-                        if (!ghostSnap.empty) {
-                            await runTransaction(db, async (t) => {
-                                t.delete(ghostSnap.docs[0].ref);
-                                t.update(docRef, { player_count: increment(-1) });
-                            });
-                        }
-                    }
-                }
-            } catch (e) { console.error("Pro Adjust failed:", e); }
-        };
-
-        window.sendAnnouncement = () => {
-            const msg = document.getElementById('msgInput').value;
-            if (msg) updateDoc(docRef, { announcement: msg });
-            document.getElementById('msgInput').value = "";
-        };
-        window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
-
-        // --- INITIALIZATION ---
-        onSnapshot(docRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                document.getElementById('count').innerText = Math.max(0, data.player_count || 0);
-                const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('status').innerText = `Live Sync Active • Last update: ${nowStr}`;
-                const bar = document.getElementById('announcementBar');
-                bar.style.display = data.announcement ? 'block' : 'none';
-                if (data.announcement) bar.innerHTML = `<div>💬 ${data.announcement}</div>`;
-                const resetEl = document.getElementById('resetStatus');
-                if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
-            }
-        });
-
-        if (new URLSearchParams(window.location.search).get('role') === 'pro') {
-            document.getElementById('adminArea').style.display = 'block';
-            document.body.style.backgroundColor = "#e1f5fe";
-            const debugEl = document.getElementById('debugId');
-            debugEl.style.display = 'block';
-            debugEl.innerText = `Admin View | ID: ${myPlayerId.substring(0,8)}`;
+        if (!isDev && document.getElementById('commitmentPage').style.display === 'block') {
+            window.showPage('live');
         }
 
         const savedName = localStorage.getItem('pickleball_nickname');
         if (savedName) document.getElementById('playerNickname').value = savedName;
+    }
 
-        checkAndReset();
-        kickOutGhosts();
-        updateUIVisibility().catch(console.error);
-    </script>
-</body>
-</html>
+    // --- 3. LIVE PAGE DOMAIN (The "I'm Here" logic) ---
+    window.handleUpdate = async (val) => {
+        const plusBtn = document.getElementById('plusBtn');
+        if(plusBtn) plusBtn.disabled = true;
+
+        try {
+            if (val === 1) {
+                await addDoc(collection(db, "tickets"), {
+                    createdAt: Timestamp.now(),
+                    playerId: myPlayerId,
+                    status: "live",
+                    type: "play"
+                });
+                await updateDoc(docRef, { player_count: increment(1) });
+                localStorage.setItem('pickleball_checkin_time', Date.now().toString());
+                
+                let visits = parseInt(localStorage.getItem('pickleball_visits') || '0') + 1;
+                localStorage.setItem('pickleball_visits', visits.toString());
+            } else {
+                const loginTime = localStorage.getItem('pickleball_checkin_time');
+                if (loginTime) {
+                    const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
+                    alert(`Great games! Your session lasted ${mins} minutes.`);
+                }
+                const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
+                const snap = await getDocs(q);
+                await runTransaction(db, async (t) => {
+                    const countSnap = await t.get(docRef);
+                    snap.forEach(d => t.delete(d.ref));
+                    t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - snap.size) });
+                });
+                localStorage.removeItem('pickleball_checkin_time');
+            }
+            refreshLiveUI();
+        } catch (e) { console.error("Live update failed:", e); }
+        setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
+    };
+
+    async function refreshLiveUI() {
+        const badge = document.getElementById('loyaltyBadge');
+        const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
+        const snap = await getDocs(q);
+        const isCheckedIn = !snap.empty;
+
+        document.getElementById('alreadyInArea').style.display = isCheckedIn ? 'block' : 'none';
+        document.getElementById('checkInArea').style.display = isCheckedIn ? 'none' : 'block';
+
+        const visits = parseInt(localStorage.getItem('pickleball_visits') || '0');
+        const statusText = getLoyaltyRank(visits);
+        if (statusText) {
+            badge.innerText = `${statusText} (Weekly Visit ${visits})`;
+            badge.style.display = 'block';
+        }
+    }
+
+    function getLoyaltyRank(visits) {
+        if (visits >= 9) return "🎯 3rd Shot Master";
+        if (visits >= 7) return "🐉 Pond Legend";
+        if (visits >= 5) return "👑 Kitchen Royalty";
+        if (visits >= 3) return "🎾 Baseline Boss";
+        if (visits >= 1) return "🛶 Pond Paddler";
+        return "";
+    }
+
+    // --- 4. COMMITMENT PAGE DOMAIN (The "Scheduled" logic) ---
+    let selectedTimeSlot = null;
+
+    window.selectSlot = (slotId) => {
+        document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+        const target = document.getElementById(`slot-${slotId}`);
+        if (target) {
+            target.classList.add('selected');
+            selectedTimeSlot = slotId;
+            updateRoster(slotId);
+        }
+    };
+
+    window.updateRoster = (slotId) => {
+        const rosterEl = document.getElementById('playerList');
+        rosterEl.innerHTML = "<p style='color:#bdc3c7;'>Checking the Pond...</p>";
+        
+        const q = query(
+            collection(db, "tickets"),
+            where("status", "==", "scheduled"),
+            where("timeSlot", "==", slotId)
+        );
+
+        onSnapshot(q, (snap) => {
+            if (snap.empty) {
+                rosterEl.innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Nobody yet. Be the first!</p>";
+                return;
+            }
+            let html = '<ul style="list-style:none; padding:0; margin:0;">';
+            snap.forEach(doc => {
+                const data = doc.data();
+                const isMe = data.playerId === myPlayerId ? " (You)" : "";
+                html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🎾 <b>${data.displayName}</b>${isMe}</li>`;
+            });
+            html += '</ul>';
+            rosterEl.innerHTML = html;
+        });
+    };
+
+    window.submitCommitment = async () => {
+        const nameInput = document.getElementById('playerNickname');
+        const name = nameInput.value.trim() || "A Local Player";
+        
+        if (!selectedTimeSlot) {
+            alert("Please 'dip your finger' on a time slot first! 🎾");
+            return;
+        }
+
+        const btn = document.getElementById('commitBtn');
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        try {
+            await addDoc(collection(db, "tickets"), {
+                playerId: myPlayerId,
+                displayName: name,
+                timeSlot: selectedTimeSlot,
+                status: "scheduled",
+                createdAt: Timestamp.now(),
+                date: new Date().toDateString()
+            });
+            localStorage.setItem('pickleball_nickname', name);
+            alert(`Booyah! ${name} is down for the ${selectedTimeSlot} slot.`);
+            
+            selectedTimeSlot = null;
+            document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+            document.getElementById('playerList').innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Tap a time slot to see the crew!</p>";
+        } catch (e) { console.error("Commitment failed:", e); }
+        finally {
+            btn.disabled = false;
+            btn.innerText = "+ I'll Be There";
+        }
+    };
+
+    window.withdrawCommitment = async () => {
+        if (!currentCommitId) return;
+        if (confirm("Remove your name from the Pond roster?")) {
+            try {
+                await deleteDoc(doc(db, "tickets", currentCommitId));
+                console.log("🏃 Removed from roster.");
+            } catch (e) { console.error("Withdrawal failed:", e); }
+        }
+    };
+
+    // --- 5. ADMIN & SYSTEM MAINTENANCE ---
+    const runMaintenance = async () => {
+        const today = new Date().toDateString();
+        try {
+            await runTransaction(db, async (t) => {
+                const courtSnap = await t.get(docRef);
+                
+                // 1. DAILY RESET (Only happens once per day)
+                if (courtSnap.data().last_reset_day !== today) {
+                    console.log("☀️ Morning Reset: Clearing Live counts...");
+                    
+                    // Reset the counter to 0 for the new day
+                    t.update(docRef, {
+                        player_count: 0,
+                        last_reset_day: today,
+                        last_reset_time: new Date().toLocaleTimeString()
+                    });
+
+                    // 2. CLEAR ONLY "LIVE" GHOSTS
+                    // We leave 'scheduled' tickets alone so afternoon games stay on the books!
+                    const liveTickets = await getDocs(query(collection(db, "tickets"), where("status", "==", "live")));
+                    liveTickets.forEach(d => t.delete(d.ref));
+                }
+            });
+        } catch (e) { console.error("Janitor failed his shift:", e); }
+
+        // 3. GHOST CLEANUP (Ongoing 2-hour expiry for Live players)
+        const expiredTime = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
+        const q = query(collection(db, "tickets"), where("createdAt", "<", expiredTime), where("status", "==", "live"));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            await runTransaction(db, async (t) => {
+                const countSnap = await t.get(docRef);
+                snap.forEach(d => t.delete(d.ref));
+                const newCount = Math.max(0, (countSnap.data().player_count || 0) - snap.size);
+                t.update(docRef, { player_count: newCount });
+            });
+        }
+    };
+
+    window.proAdjust = async (val) => {
+        try {
+            if (val === 1) {
+                const guestId = "manager_guest_" + Math.random().toString(36).substr(2, 5);
+                await addDoc(collection(db, "tickets"), {
+                    createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
+                });
+                await updateDoc(docRef, { player_count: increment(1) });
+            } else {
+                const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
+                const manualSnap = await getDocs(manualQ);
+                const targetDoc = !manualSnap.empty ? manualSnap.docs[0] : (await getDocs(query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1)))).docs[0];
+                
+                if (targetDoc) {
+                    await runTransaction(db, async (t) => {
+                        t.delete(targetDoc.ref);
+                        t.update(docRef, { player_count: increment(-1) });
+                    });
+                }
+            }
+        } catch (e) { console.error("Pro Adjust failed:", e); }
+    };
+
+    window.sendAnnouncement = () => {
+        const msg = document.getElementById('msgInput').value;
+        if (msg) updateDoc(docRef, { announcement: msg });
+        document.getElementById('msgInput').value = "";
+    };
+    window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
+
+    // --- 6. STARTUP & LISTENERS ---
+    onSnapshot(docRef, (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        document.getElementById('count').innerText = Math.max(0, data.player_count || 0);
+        document.getElementById('status').innerText = `Live Sync Active • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        
+        const bar = document.getElementById('announcementBar');
+        bar.style.display = data.announcement ? 'block' : 'none';
+        if (data.announcement) bar.innerHTML = `<div>💬 ${data.announcement}</div>`;
+        
+        const resetEl = document.getElementById('resetStatus');
+        if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
+    });
+
+    // COMMITMENT BOUNCER: Swaps "I'll Be There" for "Withdraw" if you have a scheduled ticket
+    onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
+        const commitBtn = document.getElementById('commitBtn');
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        
+        if (!snap.empty) {
+            currentCommitId = snap.docs[0].id;
+            if(commitBtn) commitBtn.style.display = 'none';
+            if(withdrawBtn) withdrawBtn.style.display = 'block';
+        } else {
+            currentCommitId = null;
+            if(commitBtn) commitBtn.style.display = 'block';
+            if(withdrawBtn) withdrawBtn.style.display = 'none';
+        }
+    });
+
+    if (new URLSearchParams(window.location.search).get('role') === 'pro') {
+        document.getElementById('adminArea').style.display = 'block';
+        document.body.style.backgroundColor = "#e1f5fe";
+    }
+
+    updateGlobalVisibility();
+    refreshLiveUI();
+    runMaintenance();
+</script>
+
