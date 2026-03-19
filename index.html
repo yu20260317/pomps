@@ -317,28 +317,67 @@
     // --- 5. ADMIN & SYSTEM MAINTENANCE ---
     const runMaintenance = async () => {
         const today = new Date().toDateString();
+        const now = Date.now();
+        
         try {
+            // --- 1. THE MORNING RESET (Atomic Transaction) ---
             await runTransaction(db, async (t) => {
                 const courtSnap = await t.get(docRef);
-                
-                // 1. DAILY RESET (Only happens once per day)
+                if (!courtSnap.exists()) return;
+
                 if (courtSnap.data().last_reset_day !== today) {
-                    console.log("☀️ Morning Reset: Clearing Live counts...");
+                    console.log("🧹 Janitor: New day detected. Resetting the court...");
                     
-                    // Reset the counter to 0 for the new day
+                    // Reset global counter and record the wipe time
                     t.update(docRef, {
                         player_count: 0,
                         last_reset_day: today,
-                        last_reset_time: new Date().toLocaleTimeString()
+                        last_reset_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     });
 
-                    // 2. CLEAR ONLY "LIVE" GHOSTS
-                    // We leave 'scheduled' tickets alone so afternoon games stay on the books!
-                    const liveTickets = await getDocs(query(collection(db, "tickets"), where("status", "==", "live")));
-                    liveTickets.forEach(d => t.delete(d.ref));
+                    // Clear ONLY "Live" tickets from yesterday (keep future commitments)
+                    const liveTicketsQuery = query(collection(db, "tickets"), where("status", "==", "live"));
+                    const liveSnap = await getDocs(liveTicketsQuery);
+                    liveSnap.forEach(d => t.delete(d.ref));
                 }
             });
-        } catch (e) { console.error("Janitor failed his shift:", e); }
+
+            // --- 2. THE GHOST SWEEP (2-Hour Expiry for Live) ---
+            const liveExpiry = Timestamp.fromMillis(now - EXPIRY_TIME);
+            const ghostQuery = query(collection(db, "tickets"),
+                                     where("createdAt", "<", liveExpiry),
+                                     where("status", "==", "live"));
+            
+            const ghostSnap = await getDocs(ghostQuery);
+            if (!ghostSnap.empty) {
+                await runTransaction(db, async (t) => {
+                    const countSnap = await t.get(docRef);
+                    ghostSnap.forEach(d => t.delete(d.ref));
+                    const currentCount = countSnap.data().player_count || 0;
+                    t.update(docRef, { player_count: Math.max(0, currentCount - ghostSnap.size) });
+                });
+                console.log(`🧹 Janitor: Swept ${ghostSnap.size} live ghosts.`);
+            }
+
+            // --- 3. THE SCHEDULE PURGE (24-Hour Expiry for Commitments) ---
+            const scheduleExpiry = Timestamp.fromMillis(now - (1000 * 60 * 60 * 24)); // 24 Hours
+            const oldScheduleQuery = query(collection(db, "tickets"),
+                                           where("createdAt", "<", scheduleExpiry),
+                                           where("status", "==", "scheduled"));
+            
+            const scheduleSnap = await getDocs(oldScheduleQuery);
+            if (!scheduleSnap.empty) {
+                scheduleSnap.forEach(async (d) => {
+                    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                    await deleteDoc(d.ref);
+                });
+                console.log(`🧹 Janitor: Purged ${scheduleSnap.size} expired commitments.`);
+            }
+
+        } catch (e) {
+            console.error("Janitor is exhausted:", e);
+        }
+    };
 
         // 3. GHOST CLEANUP (Ongoing 2-hour expiry for Live players)
         const expiredTime = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
