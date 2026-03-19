@@ -23,6 +23,22 @@
         #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 20px; }
         #announcementBar { background: #ecf0f1; color: #2c3e50; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none; border: 1px solid #dcdde1; text-align: left; }
         #adminArea { display: none; margin-top: 30px; padding: 15px; border: 2px dashed #3498db; border-radius: 15px; background: rgba(255, 255, 255, 0.5); }
+        .time-tile {
+            /* ... existing styles ... */
+            cursor: pointer;
+            transition: transform 0.1s active, background-color 0.2s;
+            -webkit-tap-highlight-color: transparent; /* Removes the ugly grey box on iPhones */
+        }
+
+        .time-tile:active {
+            transform: scale(0.92); /* Shrinks slightly when pressed */
+        }
+
+        .time-tile.selected {
+            border: 2px solid #3498db !important;
+            background-color: #ebf5ff !important;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -69,15 +85,54 @@
         </div>
     </div>
 
-    <div id="commitmentPage" style="display: none;">
-        <div class="counter-box">
-            <h3 style="color: #27ae60;">Pond Commitments</h3>
-            <p style="font-size: 0.9rem; color: #7f8c8d;">Who is coming to play?</p>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-            <div id="commitmentList">
-                <p style="padding: 20px; color: #bdc3c7; font-style: italic;">No commitments found for today.</p>
+    <div id="commitmentPage" style="display: none; padding: 10px;">
+        <div class="time-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;">
+            <div id="slot-0700" class="time-tile" onclick="selectSlot('0700')">
+                <div style="font-size: 1.5rem;">🌅</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">Early Birds</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">7a - 9a</div>
             </div>
-            <button class="plus" style="background: #3498db;">+ I'll Be There</button>
+            <div id="slot-0900" class="time-tile" onclick="selectSlot('0900')">
+                <div style="font-size: 1.5rem;">☕</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">Coffee Crew</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">9a - 11a</div>
+            </div>
+            <div id="slot-1100" class="time-tile" onclick="selectSlot('1100')">
+                <div style="font-size: 1.5rem;">☀️</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">High Nooners</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">11a - 2p</div>
+            </div>
+            <div id="slot-1400" class="time-tile" onclick="selectSlot('1400')">
+                <div style="font-size: 1.5rem;">🎾</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">Afternooners</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">2p - 4p</div>
+            </div>
+            <div id="slot-1600" class="time-tile" onclick="selectSlot('1600')">
+                <div style="font-size: 1.5rem;">🌇</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">Sunset Squad</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">4p - 6p</div>
+            </div>
+            <div id="slot-1800" class="time-tile" onclick="selectSlot('1800')">
+                <div style="font-size: 1.5rem;">🌙</div>
+                <div style="font-weight: bold; font-size: 0.9rem;">Night Owls</div>
+                <div style="font-size: 0.7rem; color: #7f8c8d;">6p - Dark</div>
+            </div>
+        </div>
+
+        <div id="rosterArea" style="text-align: left; padding: 20px 10px; margin-top: 20px; background: white; border-radius: 15px;">
+            <p style="font-size: 0.8rem; color: #7f8c8d; font-weight: bold; text-transform: uppercase;">Who's coming:</p>
+            <div id="playerList" style="font-size: 0.9rem; color: #2c3e50;">
+                <p style="color: #bdc3c7; font-style: italic;">Tap a time slot to see the crew!</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; padding-bottom: 40px;">
+            <input type="text" id="playerNickname" placeholder="Your Nickname..."
+                   style="width: 85%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem;">
+            
+            <button id="commitBtn" class="plus" onclick="submitCommitment()" style="margin-top: 15px; background: #3498db;">
+                + I'll Be There
+            </button>
         </div>
     </div>
 
@@ -270,9 +325,33 @@
             document.getElementById('alreadyInArea').style.display = isActuallyCheckedIn ? 'block' : 'none';
             document.getElementById('checkInArea').style.display = isActuallyCheckedIn ? 'none' : 'block';
             const statusText = getStatus(visitCount);
+            
+            // Check for the Secret Developer Switch
+            const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
+
+            if (!isDev) {
+                // Hide the Commitment tab button from the public
+                document.getElementById('tabCommit').style.display = 'none';
+                
+                // Safety: If they somehow land on the commitment page, force them back to Live
+                if (document.getElementById('commitmentPage').style.display === 'block') {
+                    showPage('live');
+                }
+            } else {
+                // Show a little "Dev Mode" indicator so you know it's active
+                console.log("🛠️ Dev Mode Active: Commitment Page Unlocked.");
+            }
+            
+            
+            
             if (statusText) {
                 badge.innerText = `${statusText} (Weekly Visit ${visitCount})`;
                 badge.style.display = 'block';
+            }
+            
+            const savedName = localStorage.getItem('pickleball_nickname');
+            if (savedName) {
+                document.getElementById('playerNickname').value = savedName;
             }
         }
 
@@ -301,6 +380,166 @@
         window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
 
         updateUIVisibility().catch(console.error);
+        
+        let selectedTimeSlot = null;
+
+        window.selectSlot = (slotId) => {
+            document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+            const target = document.getElementById(`slot-${slotId}`);
+            if (target) {
+                target.classList.add('selected');
+                selectedTimeSlot = slotId;
+                
+                // --- NEW: Update the list below ---
+                updateRoster(slotId);
+            }
+        };
+        
+        window.updateRoster = (slotId) => {
+            const rosterEl = document.getElementById('playerList');
+            rosterEl.innerHTML = "<p style='color:#bdc3c7;'>Loading the crew...</p>";
+
+            // Query for today's commitments in this specific slot
+            const q = query(
+                collection(db, "tickets"),
+                where("status", "==", "scheduled"),
+                where("timeSlot", "==", slotId),
+                orderBy("createdAt", "asc")
+            );
+
+            // Live listener: If someone else signs up while you're looking, it pops up!
+            onSnapshot(q, (snap) => {
+                if (snap.empty) {
+                    rosterEl.innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Nobody yet. Be the first!</p>";
+                    return;
+                }
+
+                let html = '<ul style="list-style:none; padding:0; margin:0;">';
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const isMe = data.playerId === myPlayerId ? " (You)" : "";
+                    html += `<li style="padding:8px 0; border-bottom:1px solid #eee;">🎾 <b>${data.displayName}</b>${isMe}</li>`;
+                });
+                html += '</ul>';
+                rosterEl.innerHTML = html;
+            });
+        };
+        
+        window.submitCommitment = async () => {
+            const nameInput = document.getElementById('playerNickname');
+            const commitBtn = document.getElementById('commitBtn');
+            
+            // 1. Validation: Did they "Dip" a finger?
+            if (!window.selectedTimeSlot) {
+                alert("Select a time slot first (🌅, ☕, etc.)!");
+                return;
+            }
+
+            // 2. Validation: Did they enter a name?
+            const name = nameInput.value.trim() || "A Local Player";
+            
+            // 3. UI Feedback: Disable button so they don't double-tap
+            commitBtn.disabled = true;
+            commitBtn.innerText = "Saving...";
+
+            try {
+                // 4. Send to Firestore
+                await addDoc(collection(db, "tickets"), {
+                    playerId: myPlayerId,
+                    displayName: name,
+                    timeSlot: window.selectedTimeSlot,
+                    status: "scheduled",
+                    createdAt: Timestamp.now(),
+                    date: new Date().toDateString()
+                });
+
+                // 5. Success! Save name for next time and reset
+                localStorage.setItem('pickleball_nickname', name);
+                alert(`Booyah! ${name} is down for the ${window.selectedTimeSlot} slot.`);
+                
+                // Reset the UI for the next person
+                window.selectedTimeSlot = null;
+                document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+                nameInput.value = "";
+
+            } catch (e) {
+                console.error("Commitment failed:", e);
+                alert("Pond Error: " + e.message);
+            } finally {
+                // 6. Re-enable button
+                commitBtn.disabled = false;
+                commitBtn.innerText = "+ I'll Be There";
+            }
+        };
+        // --- COMMITMENT LOGIC ---
+                window.updateRoster = (slotId) => {
+                    const rosterEl = document.getElementById('playerList');
+                    rosterEl.innerHTML = "<p style='color:#bdc3c7;'>Checking the Pond...</p>";
+
+                    const q = query(
+                        collection(db, "tickets"),
+                        where("status", "==", "scheduled"),
+                        where("timeSlot", "==", slotId)
+                    );
+
+                    onSnapshot(q, (snap) => {
+                        if (snap.empty) {
+                            rosterEl.innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Nobody yet. Be the first!</p>";
+                            return;
+                        }
+                        let html = '<ul style="list-style:none; padding:0; margin:0;">';
+                        snap.forEach(doc => {
+                            const data = doc.data();
+                            const isMe = data.playerId === myPlayerId ? " (You)" : "";
+                            html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🎾 <b>${data.displayName}</b>${isMe}</li>`;
+                        });
+                        html += '</ul>';
+                        rosterEl.innerHTML = html;
+                    });
+                };
+
+                window.submitCommitment = async () => {
+                    const nameInput = document.getElementById('playerNickname');
+                    const name = nameInput.value.trim() || "A Local Player";
+                    
+                    if (!selectedTimeSlot) {
+                        alert("Please 'dip your finger' on a time slot first! 🎾");
+                        return;
+                    }
+
+                    const btn = document.getElementById('commitBtn');
+                    btn.disabled = true;
+                    btn.innerText = "Saving...";
+
+                    try {
+                        await addDoc(collection(db, "tickets"), {
+                            playerId: myPlayerId,
+                            displayName: name,
+                            timeSlot: selectedTimeSlot,
+                            status: "scheduled",
+                            createdAt: Timestamp.now(),
+                            date: new Date().toDateString()
+                        });
+
+                        localStorage.setItem('pickleball_nickname', name);
+                        alert(`Booyah! ${name} is down for the ${selectedTimeSlot} slot.`);
+                        
+                        // Clear the highlight after saving
+                        selectedTimeSlot = null;
+                        document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+                        document.getElementById('playerList').innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Tap a time slot to see the crew!</p>";
+                    } catch (e) {
+                        console.error(e);
+                        alert("Commitment failed. Check your index!");
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = "+ I'll Be There";
+                    }
+                };
+
+                // Load saved name on startup
+                const savedName = localStorage.getItem('pickleball_nickname');
+                if (savedName) document.getElementById('playerNickname').value = savedName;
     </script>
 </body>
 </html>
