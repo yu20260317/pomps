@@ -1,6 +1,3 @@
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,9 +19,11 @@
         #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 20px; }
         #announcementBar { background: #ecf0f1; color: #2c3e50; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none; border: 1px solid #dcdde1; text-align: left; }
         #adminArea { display: none; margin-top: 30px; padding: 15px; border: 2px dashed #3498db; border-radius: 15px; background: rgba(255, 255, 255, 0.5); }
-        .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; }
+        .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .time-tile:active { transform: scale(0.92); }
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
+        /* Style for live roster pills */
+        .player-pill { background: #ebf5ff; color: #0288d1; padding: 4px 12px; border-radius: 15px; font-size: 0.85rem; font-weight: 500; border: 1px solid #b3e5fc; }
     </style>
 </head>
 <body>
@@ -40,6 +39,16 @@
             <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
             <div id="loyaltyBadge"></div>
             <h1 id="count">...</h1>
+            
+            <div id="liveRoster" style="margin-bottom: 20px;">
+                <div id="rosterList" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 20px;"></div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="playerNickname" placeholder="Your Nickname..."
+                       style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem;">
+            </div>
+
             <div id="checkInArea">
                 <button id="plusBtn" class="plus" onclick="handleUpdate(1)">+ I'm Here</button>
             </div>
@@ -62,7 +71,6 @@
                 <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
                     System: Last Daily Wipe at ...
                 </p>
-                <p id="debugId" style="font-size: 0.65rem; color: #bdc3c7; margin-top: 15px; font-family: monospace; display: none;"></p>
             </div>
         </div>
     </div>
@@ -109,23 +117,22 @@
         </div>
 
         <div style="margin-top: 20px; padding-bottom: 40px;">
-            <input type="text" id="playerNickname" placeholder="Your Nickname..."
-                   style="width: 85%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem;">
             <button id="commitBtn" class="plus" onclick="submitCommitment()" style="margin-top: 15px; background: #3498db;">
                 + I'll Be There
             </button>
-        <button id="withdrawBtn" onclick="withdrawCommitment()"
+            <button id="withdrawBtn" onclick="withdrawCommitment()"
                 style="display:none; width: 100%; background:none; color:#e74c3c; font-size: 0.9rem; font-weight: bold; text-decoration: underline; border:none; margin-top: 15px; cursor: pointer;">
-            ❌ I can't make it anymore (Withdraw)
-        </button>
+                ❌ I can't make it anymore (Withdraw)
+            </button>
         </div>
     </div>
     
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // --- 1. INITIALIZATION & CONFIG ---
+    // Production Project: pickleball-tracker-480a7
     const app = initializeApp({
         apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
         authDomain: "pickleball-tracker-dev.firebaseapp.com",
@@ -136,14 +143,26 @@
         measurementId: "G-RGCH777LTC"
     });
 
-    const db = getFirestore(app);
-    const docRef = doc(db, "counts", "court_1");
-    const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours
 
+    //const db = getFirestore(app);
+    
+    import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // REPLACE: const db = getFirestore(app);
+    // WITH THIS:
+    const db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      useFetchStreams: false
+    });
+        
+        
+    const docRef = doc(db, "counts", "court_1");
+    const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours for Live tickets
+
+    // Identity Management: Keep users consistent across visits
     let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pickleball_player_id', myPlayerId);
 
-    // Track current active commitment ID for withdrawal
     let currentCommitId = null;
 
     // --- 2. SHARED UI LOGIC ---
@@ -155,6 +174,7 @@
     };
 
     async function updateGlobalVisibility() {
+        // Toggle feature visibility based on ?dev=y flag
         const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
         document.getElementById('tabCommit').style.display = isDev ? 'block' : 'none';
         
@@ -166,16 +186,24 @@
         if (savedName) document.getElementById('playerNickname').value = savedName;
     }
 
-    // --- 3. LIVE PAGE DOMAIN (The "I'm Here" logic) ---
+    // --- 3. LIVE PAGE DOMAIN (Real-time Presence) ---
     window.handleUpdate = async (val) => {
         const plusBtn = document.getElementById('plusBtn');
         if(plusBtn) plusBtn.disabled = true;
 
+        const nameInput = document.getElementById('playerNickname');
+        const currentName = nameInput.value.trim() || "A Local Player";
+
         try {
             if (val === 1) {
+                // Save name for consistency
+                localStorage.setItem('pickleball_nickname', currentName);
+                
+                // Check-in: Create live ticket and increment counter
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(),
                     playerId: myPlayerId,
+                    displayName: currentName,
                     status: "live",
                     type: "play"
                 });
@@ -185,6 +213,7 @@
                 let visits = parseInt(localStorage.getItem('pickleball_visits') || '0') + 1;
                 localStorage.setItem('pickleball_visits', visits.toString());
             } else {
+                // Check-out: Find ticket, delete it, and decrement counter
                 const loginTime = localStorage.getItem('pickleball_checkin_time');
                 if (loginTime) {
                     const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
@@ -230,7 +259,7 @@
         return "";
     }
 
-    // --- 4. COMMITMENT PAGE DOMAIN (The "Scheduled" logic) ---
+    // --- 4. COMMITMENT PAGE DOMAIN (Scheduling) ---
     let selectedTimeSlot = null;
 
     window.selectSlot = (slotId) => {
@@ -309,76 +338,78 @@
         if (confirm("Remove your name from the Pond roster?")) {
             try {
                 await deleteDoc(doc(db, "tickets", currentCommitId));
-                console.log("🏃 Removed from roster.");
             } catch (e) { console.error("Withdrawal failed:", e); }
         }
     };
 
-    // --- 5. ADMIN & SYSTEM MAINTENANCE ---
+    // --- 5. ADMIN & SYSTEM MAINTENANCE (The Janitor) ---
     const runMaintenance = async () => {
-        const today = new Date().toDateString();
-        const now = Date.now();
+        const todayStr = new Date().toDateString();
+        const now = new Date();
+        const currentHour = now.getHours();
         
         try {
-            // --- 1. THE MORNING RESET (Atomic Transaction) ---
+            // --- A. THE MORNING RESET ---
             await runTransaction(db, async (t) => {
                 const courtSnap = await t.get(docRef);
                 if (!courtSnap.exists()) return;
 
-                if (courtSnap.data().last_reset_day !== today) {
-                    console.log("🧹 Janitor: New day detected. Resetting the court...");
-                    
-                    // Reset global counter and record the wipe time
+                if (courtSnap.data().last_reset_day !== todayStr) {
+                    console.log("🧹 Morning Reset triggered.");
                     t.update(docRef, {
                         player_count: 0,
-                        last_reset_day: today,
+                        last_reset_day: todayStr,
                         last_reset_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     });
-
-                    // Clear ONLY "Live" tickets from yesterday (keep future commitments)
                     const liveTicketsQuery = query(collection(db, "tickets"), where("status", "==", "live"));
                     const liveSnap = await getDocs(liveTicketsQuery);
                     liveSnap.forEach(d => t.delete(d.ref));
                 }
             });
 
-            // --- 2. THE GHOST SWEEP (2-Hour Expiry for Live) ---
-            const liveExpiry = Timestamp.fromMillis(now - EXPIRY_TIME);
-            const ghostQuery = query(collection(db, "tickets"),
-                                     where("createdAt", "<", liveExpiry),
-                                     where("status", "==", "live"));
-            
+            // --- B. THE GHOST SWEEP (2-Hour Live Expiry) ---
+            const liveExpiry = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
+            const ghostQuery = query(collection(db, "tickets"), where("createdAt", "<", liveExpiry), where("status", "==", "live"));
             const ghostSnap = await getDocs(ghostQuery);
             if (!ghostSnap.empty) {
                 await runTransaction(db, async (t) => {
                     const countSnap = await t.get(docRef);
                     ghostSnap.forEach(d => t.delete(d.ref));
-                    const currentCount = countSnap.data().player_count || 0;
-                    t.update(docRef, { player_count: Math.max(0, currentCount - ghostSnap.size) });
+                    t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - ghostSnap.size) });
                 });
-                console.log(`🧹 Janitor: Swept ${ghostSnap.size} live ghosts.`);
             }
 
-            // --- 3. THE SCHEDULE PURGE (24-Hour Expiry for Commitments) ---
-            const scheduleExpiry = Timestamp.fromMillis(now - (1000 * 60 * 60 * 24)); // 24 Hours
-            const oldScheduleQuery = query(collection(db, "tickets"),
-                                           where("createdAt", "<", scheduleExpiry),
-                                           where("status", "==", "scheduled"));
-            
-            const scheduleSnap = await getDocs(oldScheduleQuery);
-            if (!scheduleSnap.empty) {
-                scheduleSnap.forEach(async (d) => {
-                    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-                    await deleteDoc(d.ref);
-                });
-                console.log(`🧹 Janitor: Purged ${scheduleSnap.size} expired commitments.`);
-            }
+            // --- C. PRECISION SCHEDULE PURGE ---
+            // Maps the slot IDs to the hour they should disappear
+            const slotEndTimes = {
+                "0700": 9,
+                "0900": 11,
+                "1100": 14,
+                "1400": 16,
+                "1600": 18,
+                "1800": 22
+            };
 
-        } catch (e) {
-            console.error("Janitor is exhausted:", e);
-        }
+            const q = query(collection(db, "tickets"), where("date", "==", todayStr), where("status", "==", "scheduled"));
+            const snapshot = await getDocs(q);
+            const batch = writeBatch(db);
+            let deletedCount = 0;
+
+            snapshot.forEach(doc => {
+                const slot = doc.data().timeSlot;
+                const endHour = slotEndTimes[slot];
+                if (endHour && currentHour >= endHour) {
+                    batch.delete(doc.ref);
+                    deletedCount++;
+                }
+            });
+
+            if (deletedCount > 0) await batch.commit();
+
+        } catch (e) { console.error("Janitor error:", e); }
     };
 
+    // PRO CONTROL: Manual adjustment logic
     window.proAdjust = async (val) => {
         try {
             if (val === 1) {
@@ -388,6 +419,7 @@
                 });
                 await updateDoc(docRef, { player_count: increment(1) });
             } else {
+                // Try to delete a manual entry first, fallback to oldest entry
                 const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
                 const manualSnap = await getDocs(manualQ);
                 const targetDoc = !manualSnap.empty ? manualSnap.docs[0] : (await getDocs(query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1)))).docs[0];
@@ -409,7 +441,7 @@
     };
     window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
 
-    // --- 6. STARTUP & LISTENERS ---
+    // --- 6. LISTENERS ---
     onSnapshot(docRef, (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
@@ -424,11 +456,29 @@
         if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
     });
 
-    // COMMITMENT BOUNCER: Swaps "I'll Be There" for "Withdraw" if you have a scheduled ticket
+    // Listener for front-page live roster
+    onSnapshot(query(collection(db, "tickets"), where("status", "==", "live")), (snap) => {
+        const rosterList = document.getElementById('rosterList');
+        if (!rosterList) return;
+        rosterList.innerHTML = "";
+        if (snap.empty) {
+            rosterList.innerHTML = "<span style='color: #bdc3c7; font-style: italic; font-size: 0.8rem;'>Pond is quiet...</span>";
+            return;
+        }
+        snap.forEach((doc) => {
+            const data = doc.data();
+            const name = data.displayName || "Someone";
+            const pill = document.createElement('span');
+            pill.className = 'player-pill';
+            pill.innerText = `🎾 ${name}`;
+            rosterList.appendChild(pill);
+        });
+    });
+
+    // Toggle Withdraw button if user has a scheduled game
     onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
         const commitBtn = document.getElementById('commitBtn');
         const withdrawBtn = document.getElementById('withdrawBtn');
-        
         if (!snap.empty) {
             currentCommitId = snap.docs[0].id;
             if(commitBtn) commitBtn.style.display = 'none';
@@ -449,4 +499,5 @@
     refreshLiveUI();
     runMaintenance();
 </script>
-
+</body>
+</html>
