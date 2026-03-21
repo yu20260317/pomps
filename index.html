@@ -22,8 +22,6 @@
         .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .time-tile:active { transform: scale(0.92); }
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
-        /* Style for live roster pills */
-        .player-pill { background: #ebf5ff; color: #0288d1; padding: 4px 12px; border-radius: 15px; font-size: 0.85rem; font-weight: 500; border: 1px solid #b3e5fc; }
     </style>
 </head>
 <body>
@@ -39,14 +37,14 @@
             <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
             <div id="loyaltyBadge"></div>
             <h1 id="count">...</h1>
-            
-            <div id="liveRoster" style="margin-bottom: 20px;">
-                <div id="rosterList" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-height: 20px;"></div>
-            </div>
 
-            <div style="margin-bottom: 20px;">
-                <input type="text" id="playerNickname" placeholder="Your Nickname..."
-                       style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem;">
+            <!-- MOVED FROM COMMITMENT PAGE: Player Nickname Input -->
+            <input type="text" id="playerNickname" placeholder="Your Nickname..."
+                   style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 15px;">
+
+            <!-- NEW: Live Player Roster -->
+            <div id="livePlayerRoster" style="display: flex; flex-wrap: wrap; justify-content: center; max-height: 150px; overflow-y: auto; margin-bottom: 15px;">
+                <!-- Player names will dynamically appear here -->
             </div>
 
             <div id="checkInArea">
@@ -143,18 +141,12 @@
         measurementId: "G-RGCH777LTC"
     });
 
-
-    //const db = getFirestore(app);
-    
     import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // REPLACE: const db = getFirestore(app);
-    // WITH THIS:
     const db = initializeFirestore(app, {
       experimentalForceLongPolling: true,
       useFetchStreams: false
     });
-        
         
     const docRef = doc(db, "counts", "court_1");
     const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours for Live tickets
@@ -191,23 +183,24 @@
         const plusBtn = document.getElementById('plusBtn');
         if(plusBtn) plusBtn.disabled = true;
 
-        const nameInput = document.getElementById('playerNickname');
-        const currentName = nameInput.value.trim() || "A Local Player";
-
         try {
             if (val === 1) {
-                // Save name for consistency
-                localStorage.setItem('pickleball_nickname', currentName);
-                
+                // MODIFIED: Fetch nickname for live Check-in
+                const nameInput = document.getElementById('playerNickname');
+                const name = nameInput.value.trim() || "🎾";
+
                 // Check-in: Create live ticket and increment counter
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(),
                     playerId: myPlayerId,
-                    displayName: currentName,
                     status: "live",
-                    type: "play"
+                    type: "play",
+                    displayName: name // Added displayName
                 });
                 await updateDoc(docRef, { player_count: increment(1) });
+                
+                // Save name to local storage so they don't have to re-type it
+                localStorage.setItem('pickleball_nickname', name);
                 localStorage.setItem('pickleball_checkin_time', Date.now().toString());
                 
                 let visits = parseInt(localStorage.getItem('pickleball_visits') || '0') + 1;
@@ -300,7 +293,7 @@
 
     window.submitCommitment = async () => {
         const nameInput = document.getElementById('playerNickname');
-        const name = nameInput.value.trim() || "A Local Player";
+        const name = nameInput.value.trim() || "🎾";
         
         if (!selectedTimeSlot) {
             alert("Please 'dip your finger' on a time slot first! 🎾");
@@ -380,14 +373,8 @@
             }
 
             // --- C. PRECISION SCHEDULE PURGE ---
-            // Maps the slot IDs to the hour they should disappear
             const slotEndTimes = {
-                "0700": 9,
-                "0900": 11,
-                "1100": 14,
-                "1400": 16,
-                "1600": 18,
-                "1800": 22
+                "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22
             };
 
             const q = query(collection(db, "tickets"), where("date", "==", todayStr), where("status", "==", "scheduled"));
@@ -419,7 +406,6 @@
                 });
                 await updateDoc(docRef, { player_count: increment(1) });
             } else {
-                // Try to delete a manual entry first, fallback to oldest entry
                 const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
                 const manualSnap = await getDocs(manualQ);
                 const targetDoc = !manualSnap.empty ? manualSnap.docs[0] : (await getDocs(query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1)))).docs[0];
@@ -456,25 +442,6 @@
         if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
     });
 
-    // Listener for front-page live roster
-    onSnapshot(query(collection(db, "tickets"), where("status", "==", "live")), (snap) => {
-        const rosterList = document.getElementById('rosterList');
-        if (!rosterList) return;
-        rosterList.innerHTML = "";
-        if (snap.empty) {
-            rosterList.innerHTML = "<span style='color: #bdc3c7; font-style: italic; font-size: 0.8rem;'>Pond is quiet...</span>";
-            return;
-        }
-        snap.forEach((doc) => {
-            const data = doc.data();
-            const name = data.displayName || "Someone";
-            const pill = document.createElement('span');
-            pill.className = 'player-pill';
-            pill.innerText = `🎾 ${name}`;
-            rosterList.appendChild(pill);
-        });
-    });
-
     // Toggle Withdraw button if user has a scheduled game
     onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
         const commitBtn = document.getElementById('commitBtn');
@@ -487,6 +454,24 @@
             currentCommitId = null;
             if(commitBtn) commitBtn.style.display = 'block';
             if(withdrawBtn) withdrawBtn.style.display = 'none';
+        }
+    });
+
+    // NEW LISTENER: Real-time update for "Who is Live"
+    onSnapshot(query(collection(db, "tickets"), where("status", "==", "live")), (snap) => {
+        const rosterEl = document.getElementById('livePlayerRoster');
+        if (rosterEl) {
+            if (snap.empty) {
+                rosterEl.innerHTML = "<span style='color: #bdc3c7; font-size: 0.9rem; font-style: italic;'>No players checked in yet.</span>";
+            } else {
+                let html = '';
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const name = data.displayName || "🎾";
+                    html += `<span style="background: #ecf0f1; border: 1px solid #bdc3c7; padding: 5px 12px; margin: 4px; border-radius: 15px; font-size: 0.85rem; color: #2c3e50;">${name}</span>`;
+                });
+                rosterEl.innerHTML = html;
+            }
         }
     });
 
