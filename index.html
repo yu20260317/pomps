@@ -232,20 +232,7 @@
         } catch (e) { console.error("Live update failed:", e); }
         setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
     };
-        // --- AUTO CHECK-IN LOGIC ---
-            // If the URL has ?action=checkin at the end, fire the button automatically
-            window.addEventListener('DOMContentLoaded', () => {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('action') === 'checkin') {
-                    // Clean the URL so refreshing the page doesn't check them in twice
-                    window.history.replaceState(null, '', window.location.pathname);
-                    
-                    // Wait 1 second for the app to load, then auto-click
-                    setTimeout(() => {
-                        handleUpdate(1);
-                    }, 1000);
-                }
-            });
+
     async function refreshLiveUI() {
         const badge = document.getElementById('loyaltyBadge');
         const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
@@ -523,3 +510,4 @@
 </script>
 </body>
 </html>
+
