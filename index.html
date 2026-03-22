@@ -16,7 +16,7 @@
         .plus { background-color: #27ae60; color: white; width: 100%; }
         .minus { background-color: #e74c3c; color: white; }
         #loyaltyBadge { font-size: 0.9rem; color: #e67e22; font-weight: bold; margin-bottom: 10px; display: none; }
-        #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 20px; }
+        #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 10px; margin-bottom: 15px; }
         #announcementBar { background: #ecf0f1; color: #2c3e50; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none; border: 1px solid #dcdde1; text-align: left; }
         #adminArea { display: none; margin-top: 30px; padding: 15px; border: 2px dashed #3498db; border-radius: 15px; background: rgba(255, 255, 255, 0.5); }
         .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -34,28 +34,35 @@
 
     <div id="livePage">
         <div class="counter-box">
+            <!-- 1. Title -->
             <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
-            <div id="loyaltyBadge"></div>
+            
+            <!-- 2. The number count -->
             <h1 id="count">...</h1>
 
-            <!-- MOVED FROM COMMITMENT PAGE: Player Nickname Input -->
+            <!-- 3. Current user ID (Nickname Input) -->
             <input type="text" id="playerNickname" placeholder="Your Nickname..."
                    style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 15px;">
 
-            <!-- NEW: Live Player Roster -->
-            <div id="livePlayerRoster" style="display: flex; flex-wrap: wrap; justify-content: center; max-height: 150px; overflow-y: auto; margin-bottom: 15px;">
-                <!-- Player names will dynamically appear here -->
-            </div>
+            <!-- 4. Current user status -->
+            <div id="loyaltyBadge"></div>
+            <div id="status">Connecting to the Pond...</div>
 
+            <!-- 5. Checkin/out -->
             <div id="checkInArea">
                 <button id="plusBtn" class="plus" onclick="handleUpdate(1)">+ I'm Here</button>
             </div>
             <div id="alreadyInArea" style="display: none;">
-                <p style="color: #27ae60; font-weight: bold;">✅ You are checked in</p>
+                <p style="color: #27ae60; font-weight: bold; margin-bottom: 5px;">✅ You are checked in</p>
                 <button id="minusBtn" class="minus" onclick="handleUpdate(-1)">- I'm Leaving</button>
             </div>
-            <div id="status">Connecting to the Pond...</div>
 
+            <!-- 6. List of the players on the field -->
+            <div id="livePlayerRoster" style="display: flex; flex-wrap: wrap; justify-content: center; max-height: 150px; overflow-y: auto; margin-top: 20px; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                <!-- Player names will dynamically appear here -->
+            </div>
+
+            <!-- Admin Area (Hidden by default) -->
             <div id="adminArea">
                 <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
                 <div style="margin-bottom: 15px;">
@@ -185,7 +192,7 @@
 
         try {
             if (val === 1) {
-                // MODIFIED: Fetch nickname for live Check-in
+                // MODIFIED: Fetch nickname for live Check-in or default to emoji
                 const nameInput = document.getElementById('playerNickname');
                 const name = nameInput.value.trim() || "🎾";
 
@@ -225,7 +232,20 @@
         } catch (e) { console.error("Live update failed:", e); }
         setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
     };
-
+        // --- AUTO CHECK-IN LOGIC ---
+            // If the URL has ?action=checkin at the end, fire the button automatically
+            window.addEventListener('DOMContentLoaded', () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('action') === 'checkin') {
+                    // Clean the URL so refreshing the page doesn't check them in twice
+                    window.history.replaceState(null, '', window.location.pathname);
+                    
+                    // Wait 1 second for the app to load, then auto-click
+                    setTimeout(() => {
+                        handleUpdate(1);
+                    }, 1000);
+                }
+            });
     async function refreshLiveUI() {
         const badge = document.getElementById('loyaltyBadge');
         const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
@@ -291,40 +311,57 @@
         });
     };
 
-    window.submitCommitment = async () => {
-        const nameInput = document.getElementById('playerNickname');
-        const name = nameInput.value.trim() || "🎾";
-        
-        if (!selectedTimeSlot) {
-            alert("Please 'dip your finger' on a time slot first! 🎾");
-            return;
-        }
+        window.submitCommitment = async () => {
+                const nameInput = document.getElementById('playerNickname');
+                const name = nameInput.value.trim() || "🎾";
+                
+                if (!selectedTimeSlot) {
+                    alert("Please 'dip your finger' on a time slot first! 🎾");
+                    return;
+                }
 
-        const btn = document.getElementById('commitBtn');
-        btn.disabled = true;
-        btn.innerText = "Saving...";
+                const btn = document.getElementById('commitBtn');
+                btn.disabled = true;
+                btn.innerText = "Saving...";
 
-        try {
-            await addDoc(collection(db, "tickets"), {
-                playerId: myPlayerId,
-                displayName: name,
-                timeSlot: selectedTimeSlot,
-                status: "scheduled",
-                createdAt: Timestamp.now(),
-                date: new Date().toDateString()
-            });
-            localStorage.setItem('pickleball_nickname', name);
-            alert(`Booyah! ${name} is down for the ${selectedTimeSlot} slot.`);
-            
-            selectedTimeSlot = null;
-            document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
-            document.getElementById('playerList').innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Tap a time slot to see the crew!</p>";
-        } catch (e) { console.error("Commitment failed:", e); }
-        finally {
-            btn.disabled = false;
-            btn.innerText = "+ I'll Be There";
-        }
-    };
+                try {
+                    // --- NEW LOGIC: Today vs. Tomorrow ---
+                    const now = new Date();
+                    const currentHour = now.getHours();
+                    const slotEndTimes = {
+                        "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22
+                    };
+                    
+                    let commitDate = now;
+                    
+                    // If the time slot is already over for today, shift the date to tomorrow
+                    if (currentHour >= slotEndTimes[selectedTimeSlot]) {
+                        commitDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    }
+
+                    await addDoc(collection(db, "tickets"), {
+                        playerId: myPlayerId,
+                        displayName: name,
+                        timeSlot: selectedTimeSlot,
+                        status: "scheduled",
+                        createdAt: Timestamp.now(),
+                        date: commitDate.toDateString() // Now saves the correct day!
+                    });
+                    
+                    localStorage.setItem('pickleball_nickname', name);
+                    
+                    const dayText = commitDate.getDate() === now.getDate() ? "today" : "tomorrow";
+                    alert(`Booyah! ${name} is down for the ${selectedTimeSlot} slot ${dayText}.`);
+                    
+                    selectedTimeSlot = null;
+                    document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
+                    document.getElementById('playerList').innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Tap a time slot to see the crew!</p>";
+                } catch (e) { console.error("Commitment failed:", e); }
+                finally {
+                    btn.disabled = false;
+                    btn.innerText = "+ I'll Be There";
+                }
+            };
 
     window.withdrawCommitment = async () => {
         if (!currentCommitId) return;
