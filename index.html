@@ -507,7 +507,16 @@
     updateGlobalVisibility();
     refreshLiveUI();
     runMaintenance();
+
+    // --- 7. AUTO CHECK-IN LOGIC ---
+    if (new URLSearchParams(window.location.search).get('action') === 'checkin') {
+        window.history.replaceState(null, '', window.location.pathname);
+        setTimeout(() => {
+            if (!localStorage.getItem('pickleball_checkin_time')) {
+                window.handleUpdate(1);
+            }
+        }, 1000);
+    }
 </script>
 </body>
 </html>
-
