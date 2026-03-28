@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomps Pond Tracker V4.0</title>
+    <title>Pomps Pond Tracker V5.1</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f4f8; transition: background-color 0.5s; }
         .tab-bar { display: flex; justify-content: center; background: white; padding: 5px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); max-width: 400px; margin-left: auto; margin-right: auto; }
@@ -17,38 +17,63 @@
         .minus { background-color: #e74c3c; color: white; }
         #loyaltyBadge { font-size: 0.9rem; color: #e67e22; font-weight: bold; margin-bottom: 10px; display: none; }
         #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 10px; margin-bottom: 15px; }
-        #announcementBar { background: #ecf0f1; color: #2c3e50; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none; border: 1px solid #dcdde1; text-align: left; }
-        #adminArea { display: none; margin-top: 30px; padding: 15px; border: 2px dashed #3498db; border-radius: 15px; background: rgba(255, 255, 255, 0.5); }
-        .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        #announcementBar {
+            background: #ecf0f1;
+            color: #2c3e50;
+            padding: 12px;
+            border-radius: 10px;
+            margin: 0 auto 20px auto; /* Added auto to center it */
+            max-width: 400px;         /* Added to match the rest of the app */
+            display: none;
+            border: 1px solid #dcdde1;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        /* ADDED: position: relative; to time-tile so the weather icon stays inside it */
+        .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; }
         .time-tile:active { transform: scale(0.92); }
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
+        
+        /* ADDED: Style for the weather icon in the corner */
+        .slot-weather { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; }
+
+        /* New Pro Styles */
+        .pro-share-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .share-btn {
+            background-color: #9b59b6; color: white; width: 80%; font-weight: bold;
+        }
+        .app-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;
+        }
+        .app-btn {
+            font-size: 0.9rem; padding: 10px; border-radius: 8px; color: white; font-weight: bold;
+        }
+        .wechat { background-color: #07C160; }
+        .teamreach { background-color: #34495e; }
     </style>
 </head>
 <body>
     <nav class="tab-bar">
         <button id="tabLive" class="tab-btn active" onclick="showPage('live')">📍 Live Now</button>
         <button id="tabCommit" class="tab-btn" onclick="showPage('commitment')">🤝 Commitment</button>
+        <button id="tabPro" class="tab-btn" onclick="showPage('pro')" style="display: none;">👑 Pro</button>
     </nav>
-
     <div id="announcementBar"></div>
-
     <div id="livePage">
         <div class="counter-box">
-            <!-- 1. Title -->
             <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
             
-            <!-- 2. The number count -->
             <h1 id="count">...</h1>
-
-            <!-- 3. Current user ID (Nickname Input) -->
             <input type="text" id="playerNickname" placeholder="Your Nickname..."
-                   style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 15px;">
-
-            <!-- 4. Current user status -->
+                   style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 1px;">
             <div id="loyaltyBadge"></div>
-            <div id="status">Connecting to the Pond...</div>
-
-            <!-- 5. Checkin/out -->
+          
             <div id="checkInArea">
                 <button id="plusBtn" class="plus" onclick="handleUpdate(1)">+ I'm Here</button>
             </div>
@@ -56,59 +81,45 @@
                 <p style="color: #27ae60; font-weight: bold; margin-bottom: 5px;">✅ You are checked in</p>
                 <button id="minusBtn" class="minus" onclick="handleUpdate(-1)">- I'm Leaving</button>
             </div>
-
-            <!-- 6. List of the players on the field -->
-            <div id="livePlayerRoster" style="display: flex; flex-wrap: wrap; justify-content: center; max-height: 150px; overflow-y: auto; margin-top: 20px; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px;">
-                <!-- Player names will dynamically appear here -->
+            
+            <div id="status">Connecting to the Pond...</div>
+            
+            <div style="margin-top: 20px; margin-bottom: 15px;">
+                <p style="font-size: 0.8rem; color: #27ae60; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">🎾 On The Court</p>
+                <div id="livePlayerRoster" style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; min-height: 50px; max-height: 150px; overflow-y: auto; background-color: #e9f7ef; border: 2px solid #27ae60; border-radius: 12px; padding: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                    </div>
             </div>
-
-            <!-- Admin Area (Hidden by default) -->
-            <div id="adminArea">
-                <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
-                <div style="margin-bottom: 15px;">
-                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 </button>
-                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1 </button>
-                </div>
-                <input type="text" id="msgInput" placeholder="Announcement..." style="width:80%; padding:8px; margin-bottom:10px;">
-                <br>
-                <button onclick="sendAnnouncement()" style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
-                <button onclick="clearAnnouncement()" style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
-                <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
-                    System: Last Daily Wipe at ...
-                </p>
             </div>
-        </div>
     </div>
-
     <div id="commitmentPage" style="display: none; padding: 10px;">
         <div class="time-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;">
             <div id="slot-0700" class="time-tile" onclick="selectSlot('0700')">
-                <div style="font-size: 1.5rem;">🌅</div>
+                <span id="w-0700" class="slot-weather"></span> <div style="font-size: 1.5rem;">🌅</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Early Birds</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">7a - 9a</div>
             </div>
             <div id="slot-0900" class="time-tile" onclick="selectSlot('0900')">
-                <div style="font-size: 1.5rem;">☕</div>
+                <span id="w-0900" class="slot-weather"></span> <div style="font-size: 1.5rem;">☕</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Coffee Crew</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">9a - 11a</div>
             </div>
             <div id="slot-1100" class="time-tile" onclick="selectSlot('1100')">
-                <div style="font-size: 1.5rem;">☀️</div>
+                <span id="w-1100" class="slot-weather"></span> <div style="font-size: 1.5rem;">☀️</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">High Nooners</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">11a - 2p</div>
             </div>
             <div id="slot-1400" class="time-tile" onclick="selectSlot('1400')">
-                <div style="font-size: 1.5rem;">🎾</div>
+                <span id="w-1400" class="slot-weather"></span> <div style="font-size: 1.5rem;">🎾</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Afternooners</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">2p - 4p</div>
             </div>
             <div id="slot-1600" class="time-tile" onclick="selectSlot('1600')">
-                <div style="font-size: 1.5rem;">🌇</div>
+                <span id="w-1600" class="slot-weather"></span> <div style="font-size: 1.5rem;">🌇</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Sunset Squad</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">4p - 6p</div>
             </div>
             <div id="slot-1800" class="time-tile" onclick="selectSlot('1800')">
-                <div style="font-size: 1.5rem;">🌙</div>
+                <span id="w-1800" class="slot-weather"></span> <div style="font-size: 1.5rem;">🌙</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Night Owls</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">6p - Dark</div>
             </div>
@@ -120,7 +131,6 @@
                 <p style="color: #bdc3c7; font-style: italic;">Tap a time slot to see the crew!</p>
             </div>
         </div>
-
         <div style="margin-top: 20px; padding-bottom: 40px;">
             <button id="commitBtn" class="plus" onclick="submitCommitment()" style="margin-top: 15px; background: #3498db;">
                 + I'll Be There
@@ -131,11 +141,39 @@
             </button>
         </div>
     </div>
+    <div id="proPage" style="display: none; padding: 10px;">
+        <div class="counter-box" style="margin: 0 auto;">
+            <div id="adminArea" style="display: block; margin-top: 0;">
+                <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
+                
+                <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">Live Count: <span id="proCountDisplay" style="color: #e74c3c;">...</span></h2>
+                
+                <div style="margin-bottom: 15px;">
+                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 Player</button> Player</button>
+                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1 Player</button>
+                </div>
+                <textarea id="msgInput" placeholder="Announcement... (Press Enter for new line)" style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
+                <br>
+                <button onclick="sendAnnouncement()" style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
+                <button onclick="clearAnnouncement()" style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
+                <div class="pro-share-box">
+                    <button class="share-btn" onclick="copyStatusToClipboard()">📋 Copy Hype Message</button>
+                    
+                    <div class="app-grid">
+                        <button class="app-btn wechat" onclick="window.location.href='weixin://'">Open WeChat</button>
+                        <button class="app-btn teamreach" onclick="window.location.href='teamreach://'">TeamReach</button>
+                    </div>
+                </div>
+                <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
+                    System: Last Daily Wipe at ...
+                </p>
+            </div>
+        </div>
+    </div>
     
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
     // --- 1. INITIALIZATION & CONFIG ---
     // Production Project: pickleball-tracker-480a7
     const app = initializeApp({
@@ -147,9 +185,7 @@
         appId: "1:561468524719:web:cafd771b3333f88801ac5a",
         measurementId: "G-RGCH777LTC"
     });
-
     import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
     const db = initializeFirestore(app, {
       experimentalForceLongPolling: true,
       useFetchStreams: false
@@ -157,21 +193,44 @@
         
     const docRef = doc(db, "counts", "court_1");
     const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours for Live tickets
-
     // Identity Management: Keep users consistent across visits
     let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pickleball_player_id', myPlayerId);
-
     let currentCommitId = null;
-
     // --- 2. SHARED UI LOGIC ---
     window.showPage = (page) => {
-        document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
-        document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
-        document.getElementById('tabLive').classList.toggle('active', page === 'live');
-        document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
-    };
-
+            document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
+            document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
+            
+            // ADDED: Control the visibility of the new Pro page
+            const proPage = document.getElementById('proPage');
+            if (proPage) proPage.style.display = (page === 'pro') ? 'block' : 'none';
+            document.getElementById('tabLive').classList.toggle('active', page === 'live');
+            document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
+            
+            // ADDED: Highlight the Pro tab when active
+            const tabPro = document.getElementById('tabPro');
+            if (tabPro) tabPro.classList.toggle('active', page === 'pro');
+            // --- NEW: Dynamically stamp Today/Tomorrow on the tiles ---
+            if (page === 'commitment') {
+                const currentHour = new Date().getHours();
+                const slotEndTimes = { "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22 };
+                
+                for (const [slot, endHour] of Object.entries(slotEndTimes)) {
+                    const slotDiv = document.getElementById(`slot-${slot}`);
+                    if (slotDiv) {
+                        const timeLabelDiv = slotDiv.children[2]; // Targets the "7a - 9a" text
+                        const isTomorrow = currentHour >= endHour;
+                        const dayText = isTomorrow ? "Tomorrow" : "Today";
+                        const badgeColor = isTomorrow ? "#e67e22" : "#27ae60"; // Orange for Tomorrow, Green for Today
+                        
+                        // Clean old text and apply new day label
+                        timeLabelDiv.innerHTML = timeLabelDiv.innerHTML.split(' <span')[0];
+                        timeLabelDiv.innerHTML += ` <span style="color: ${badgeColor}; font-weight: bold;">(${dayText})</span>`;
+                    }
+                }
+            }
+        };
     async function updateGlobalVisibility() {
         // Toggle feature visibility based on ?dev=y flag
         const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
@@ -180,22 +239,18 @@
         if (!isDev && document.getElementById('commitmentPage').style.display === 'block') {
             window.showPage('live');
         }
-
         const savedName = localStorage.getItem('pickleball_nickname');
         if (savedName) document.getElementById('playerNickname').value = savedName;
     }
-
     // --- 3. LIVE PAGE DOMAIN (Real-time Presence) ---
     window.handleUpdate = async (val) => {
         const plusBtn = document.getElementById('plusBtn');
         if(plusBtn) plusBtn.disabled = true;
-
         try {
             if (val === 1) {
                 // MODIFIED: Fetch nickname for live Check-in or default to emoji
                 const nameInput = document.getElementById('playerNickname');
-                const name = nameInput.value.trim() || "🎾";
-
+                const name = nameInput.value.trim() || "anon.";
                 // Check-in: Create live ticket and increment counter
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(),
@@ -232,16 +287,13 @@
         } catch (e) { console.error("Live update failed:", e); }
         setTimeout(() => { if(plusBtn) plusBtn.disabled = false; }, 2000);
     };
-
     async function refreshLiveUI() {
         const badge = document.getElementById('loyaltyBadge');
         const q = query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "live"));
         const snap = await getDocs(q);
         const isCheckedIn = !snap.empty;
-
         document.getElementById('alreadyInArea').style.display = isCheckedIn ? 'block' : 'none';
         document.getElementById('checkInArea').style.display = isCheckedIn ? 'none' : 'block';
-
         const visits = parseInt(localStorage.getItem('pickleball_visits') || '0');
         const statusText = getLoyaltyRank(visits);
         if (statusText) {
@@ -249,7 +301,6 @@
             badge.style.display = 'block';
         }
     }
-
     function getLoyaltyRank(visits) {
         if (visits >= 9) return "🎯 3rd Shot Master";
         if (visits >= 7) return "🐉 Pond Legend";
@@ -258,10 +309,8 @@
         if (visits >= 1) return "🛶 Pond Paddler";
         return "";
     }
-
     // --- 4. COMMITMENT PAGE DOMAIN (Scheduling) ---
     let selectedTimeSlot = null;
-
     window.selectSlot = (slotId) => {
         document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
         const target = document.getElementById(`slot-${slotId}`);
@@ -271,7 +320,6 @@
             updateRoster(slotId);
         }
     };
-
     window.updateRoster = (slotId) => {
         const rosterEl = document.getElementById('playerList');
         rosterEl.innerHTML = "<p style='color:#bdc3c7;'>Checking the Pond...</p>";
@@ -281,7 +329,6 @@
             where("status", "==", "scheduled"),
             where("timeSlot", "==", slotId)
         );
-
         onSnapshot(q, (snap) => {
             if (snap.empty) {
                 rosterEl.innerHTML = "<p style='color:#bdc3c7; font-style:italic;'>Nobody yet. Be the first!</p>";
@@ -291,26 +338,23 @@
             snap.forEach(doc => {
                 const data = doc.data();
                 const isMe = data.playerId === myPlayerId ? " (You)" : "";
-                html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🎾 <b>${data.displayName}</b>${isMe}</li>`;
+                html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🏃🏻‍ <b>${data.displayName}</b>${isMe}</li>`;
             });
             html += '</ul>';
             rosterEl.innerHTML = html;
         });
     };
-
         window.submitCommitment = async () => {
                 const nameInput = document.getElementById('playerNickname');
-                const name = nameInput.value.trim() || "🎾";
+                const name = nameInput.value.trim() || "🏃🏻‍";
                 
                 if (!selectedTimeSlot) {
-                    alert("Please 'dip your finger' on a time slot first! 🎾");
+                    alert("Please 'dip your finger' on a time slot first! 🏃🏻‍");
                     return;
                 }
-
                 const btn = document.getElementById('commitBtn');
                 btn.disabled = true;
                 btn.innerText = "Saving...";
-
                 try {
                     // --- NEW LOGIC: Today vs. Tomorrow ---
                     const now = new Date();
@@ -325,7 +369,6 @@
                     if (currentHour >= slotEndTimes[selectedTimeSlot]) {
                         commitDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
                     }
-
                     await addDoc(collection(db, "tickets"), {
                         playerId: myPlayerId,
                         displayName: name,
@@ -349,7 +392,6 @@
                     btn.innerText = "+ I'll Be There";
                 }
             };
-
     window.withdrawCommitment = async () => {
         if (!currentCommitId) return;
         if (confirm("Remove your name from the Pond roster?")) {
@@ -358,7 +400,6 @@
             } catch (e) { console.error("Withdrawal failed:", e); }
         }
     };
-
     // --- 5. ADMIN & SYSTEM MAINTENANCE (The Janitor) ---
     const runMaintenance = async () => {
         const todayStr = new Date().toDateString();
@@ -370,7 +411,6 @@
             await runTransaction(db, async (t) => {
                 const courtSnap = await t.get(docRef);
                 if (!courtSnap.exists()) return;
-
                 if (courtSnap.data().last_reset_day !== todayStr) {
                     console.log("🧹 Morning Reset triggered.");
                     t.update(docRef, {
@@ -383,7 +423,6 @@
                     liveSnap.forEach(d => t.delete(d.ref));
                 }
             });
-
             // --- B. THE GHOST SWEEP (2-Hour Live Expiry) ---
             const liveExpiry = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
             const ghostQuery = query(collection(db, "tickets"), where("createdAt", "<", liveExpiry), where("status", "==", "live"));
@@ -395,17 +434,14 @@
                     t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - ghostSnap.size) });
                 });
             }
-
             // --- C. PRECISION SCHEDULE PURGE ---
             const slotEndTimes = {
                 "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22
             };
-
             const q = query(collection(db, "tickets"), where("date", "==", todayStr), where("status", "==", "scheduled"));
             const snapshot = await getDocs(q);
             const batch = writeBatch(db);
             let deletedCount = 0;
-
             snapshot.forEach(doc => {
                 const slot = doc.data().timeSlot;
                 const endHour = slotEndTimes[slot];
@@ -414,12 +450,31 @@
                     deletedCount++;
                 }
             });
-
             if (deletedCount > 0) await batch.commit();
-
         } catch (e) { console.error("Janitor error:", e); }
     };
-
+        window.copyStatusToClipboard = async () => {
+            const currentCount = document.getElementById('count').innerText;
+            const bar = document.getElementById('announcementBar');
+            const announcement = bar.style.display === 'block' ? `\nNote: ${bar.innerText.replace('💬 ', '')}` : '';
+            
+            // Customize your hype message here!
+            const textToCopy = `🎾 Pomps Pond Update:\nThere are currently ${currentCount} players on the court!${announcement}\nCheck the live tracker: ${window.location.origin}${window.location.pathname}`;
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                const btn = document.querySelector('.share-btn');
+                const originalText = btn.innerText;
+                btn.innerText = "✅ Copied to Clipboard!";
+                btn.style.backgroundColor = "#27ae60";
+                
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = "#9b59b6";
+                }, 2000);
+            } catch (err) {
+                alert("Oops, couldn't copy automatically. Here is the text: \n\n" + textToCopy);
+            }
+        };
     // PRO CONTROL: Manual adjustment logic
     window.proAdjust = async (val) => {
         try {
@@ -443,19 +498,24 @@
             }
         } catch (e) { console.error("Pro Adjust failed:", e); }
     };
-
     window.sendAnnouncement = () => {
         const msg = document.getElementById('msgInput').value;
         if (msg) updateDoc(docRef, { announcement: msg });
         document.getElementById('msgInput').value = "";
     };
     window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
-
     // --- 6. LISTENERS ---
     onSnapshot(docRef, (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
-        document.getElementById('count').innerText = Math.max(0, data.player_count || 0);
+        const safeCount = Math.max(0, data.player_count || 0);
+        
+        document.getElementById('count').innerText = safeCount;
+        
+        // ADD THIS: Update the Pro tab's mini-display too
+        const proCountEl = document.getElementById('proCountDisplay');
+        if (proCountEl) proCountEl.innerText = safeCount;
+                
         document.getElementById('status').innerText = `Live Sync Active • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         
         const bar = document.getElementById('announcementBar');
@@ -465,7 +525,6 @@
         const resetEl = document.getElementById('resetStatus');
         if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
     });
-
     // Toggle Withdraw button if user has a scheduled game
     onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
         const commitBtn = document.getElementById('commitBtn');
@@ -480,7 +539,6 @@
             if(withdrawBtn) withdrawBtn.style.display = 'none';
         }
     });
-
     // NEW LISTENER: Real-time update for "Who is Live"
     onSnapshot(query(collection(db, "tickets"), where("status", "==", "live")), (snap) => {
         const rosterEl = document.getElementById('livePlayerRoster');
@@ -489,24 +547,84 @@
                 rosterEl.innerHTML = "<span style='color: #bdc3c7; font-size: 0.9rem; font-style: italic;'>No players checked in yet.</span>";
             } else {
                 let html = '';
-                snap.forEach(doc => {
+                const runnerIcons = ['🏃🏽‍♀️‍➡️', '🏃🏻‍♀️', '🏃🏼‍♂️', '🏃🏾‍♂️‍➡️', '🏃🏿‍♀️'];
+                let i = 0;
+                snap.forEach((doc) => {
                     const data = doc.data();
-                    const name = data.displayName || "🎾";
-                    html += `<span style="background: #ecf0f1; border: 1px solid #bdc3c7; padding: 5px 12px; margin: 4px; border-radius: 15px; font-size: 0.85rem; color: #2c3e50;">${name}</span>`;
+                    const emoji = runnerIcons[i % runnerIcons.length];
+                    
+                    const name = data.displayName || emoji;
+                    html += `<span style="background: #ecf0f1; border: 1px solid #bdc3c7; padding: 5px 12px; margin: 4px; border-radius: 15px; font-size: 0.85rem; color: #2c3e50; display: inline-block;">${name}</span>`;
+                    
+                    i++;
                 });
                 rosterEl.innerHTML = html;
             }
         }
     });
-
     if (new URLSearchParams(window.location.search).get('role') === 'pro') {
-        document.getElementById('adminArea').style.display = 'block';
+        // CHANGED: Unhide the new Pro tab instead of the old admin div inline
+        document.getElementById('tabPro').style.display = 'block';
         document.body.style.backgroundColor = "#e1f5fe";
     }
-
     updateGlobalVisibility();
     refreshLiveUI();
     runMaintenance();
+
+    // --- UPDATED: WEATHER FETCH LOGIC ---
+        async function updateWeather() {
+            try {
+                // Hourly Icons for Commitment Slots (Andover MA Gridpoints)
+                const hRes = await fetch('https://api.weather.gov/gridpoints/BOX/71,88/forecast/hourly');
+                const hData = await hRes.json();
+                const hours = hData.properties.periods;
+
+                const slotHours = { "0700": 7, "0900": 9, "1100": 11, "1400": 14, "1600": 16, "1800": 18 };
+                const slotEnds = { "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22 };
+                const now = new Date();
+                const currentHour = now.getHours();
+
+                Object.entries(slotHours).forEach(([slot, targetH]) => {
+                    let targetDate = new Date();
+                    
+                    // Exactly matches the label logic: if the slot is over, show tomorrow's weather
+                    if (currentHour >= slotEnds[slot]) {
+                        targetDate.setDate(targetDate.getDate() + 1);
+                    }
+                    targetDate.setHours(targetH, 0, 0, 0);
+
+                    const match = hours.find(h => new Date(h.startTime).getTime() === targetDate.getTime());
+                    if (match) {
+                        const lowerForecast = match.shortForecast.toLowerCase();
+                        let icon = "⛅"; // Default to Partly Cloudy/Sunny
+                        
+                        // Smarter phrase matching
+                        if (lowerForecast.includes("rain") || lowerForecast.includes("shower") || lowerForecast.includes("drizzle")) {
+                            icon = "🌧️";
+                        } else if (lowerForecast.includes("snow") || lowerForecast.includes("flurries")) {
+                            icon = "❄️";
+                        } else if (lowerForecast.includes("thunder") || lowerForecast.includes("storm")) {
+                            icon = "⛈️";
+                        } else if (lowerForecast.includes("fog")) {
+                            icon = "🌫️";
+                        } else if (lowerForecast.includes("mostly cloudy") || lowerForecast === "cloudy") {
+                            icon = "☁️";
+                        } else if (lowerForecast.includes("partly") || lowerForecast.includes("mostly clear")) {
+                            icon = "⛅"; // Catches "Partly Sunny" and "Partly Cloudy"
+                        } else if (lowerForecast.includes("sun") || lowerForecast.includes("clear")) {
+                            icon = "☀️"; // Only for pure "Sunny" or "Clear"
+                        }
+                        
+                        const el = document.getElementById(`w-${slot}`);
+                        if (el) el.innerText = icon;
+                    }
+                });
+            } catch (e) {
+                console.error("Weather Error", e);
+            }
+        }
+    updateWeather();
+    setInterval(updateWeather, 1000 * 60 * 15); // Auto-refresh weather every 15 minutes
 
     // --- 7. AUTO CHECK-IN LOGIC ---
     if (new URLSearchParams(window.location.search).get('action') === 'checkin') {
