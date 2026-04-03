@@ -31,6 +31,8 @@
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
         
         .slot-weather { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; display: flex; align-items: center; }
+        /* ADDED: Style for the temperature in the top left corner */
+        .slot-temp { position: absolute; top: 5px; left: 8px; font-size: 0.85rem; font-weight: bold; color: #7f8c8d; }
 
         /* New Pro Styles */
         .pro-share-box {
@@ -81,32 +83,32 @@
     <div id="commitmentPage" style="display: none; padding: 10px;">
         <div class="time-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;">
             <div id="slot-0700" class="time-tile" onclick="selectSlot('0700')">
-                <span id="w-0700" class="slot-weather"></span> <div style="font-size: 1.5rem;">🐓</div>
+                <span id="t-0700" class="slot-temp"></span><span id="w-0700" class="slot-weather"></span> <div style="font-size: 1.5rem;">🐓</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Early Birds</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">7a - 9a</div>
             </div>
             <div id="slot-0900" class="time-tile" onclick="selectSlot('0900')">
-                <span id="w-0900" class="slot-weather"></span> <div style="font-size: 1.5rem;">☕</div>
+                <span id="t-0900" class="slot-temp"></span><span id="w-0900" class="slot-weather"></span> <div style="font-size: 1.5rem;">☕</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Coffee Crew</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">9a - 11a</div>
             </div>
             <div id="slot-1100" class="time-tile" onclick="selectSlot('1100')">
-                <span id="w-1100" class="slot-weather"></span> <div style="font-size: 1.5rem;">🕛</div>
+                <span id="t-1100" class="slot-temp"></span><span id="w-1100" class="slot-weather"></span> <div style="font-size: 1.5rem;">🕛</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Midday Match</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">11a - 2p</div>
             </div>
             <div id="slot-1400" class="time-tile" onclick="selectSlot('1400')">
-                <span id="w-1400" class="slot-weather"></span> <div style="font-size: 1.5rem;">🎾</div>
+                <span id="t-1400" class="slot-temp"></span><span id="w-1400" class="slot-weather"></span> <div style="font-size: 1.5rem;">🎾</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Afternoon Aces</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">2p - 4p</div>
             </div>
             <div id="slot-1600" class="time-tile" onclick="selectSlot('1600')">
-                <span id="w-1600" class="slot-weather"></span> <div style="font-size: 1.5rem;">👥</div>
+                <span id="t-1600" class="slot-temp"></span><span id="w-1600" class="slot-weather"></span> <div style="font-size: 1.5rem;">👥</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Sunset Squad</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">4p - 6p</div>
             </div>
             <div id="slot-1800" class="time-tile" onclick="selectSlot('1800')">
-                <span id="w-1800" class="slot-weather"></span> <div style="font-size: 1.5rem;">🦉</div>
+                <span id="t-1800" class="slot-temp"></span><span id="w-1800" class="slot-weather"></span> <div style="font-size: 1.5rem;">🦉</div>
                 <div style="font-weight: bold; font-size: 0.9rem;">Night Owls</div>
                 <div style="font-size: 0.7rem; color: #7f8c8d;">6p - Dark</div>
             </div>
@@ -199,7 +201,7 @@
                 for (const [slot, endHour] of Object.entries(slotEndTimes)) {
                     const slotDiv = document.getElementById(`slot-${slot}`);
                     if (slotDiv) {
-                        const timeLabelDiv = slotDiv.children[2];
+                        const timeLabelDiv = slotDiv.children[3];
                         const isTomorrow = currentHour >= endHour;
                         const dayText = isTomorrow ? "Tomorrow" : "Today";
                         const badgeColor = isTomorrow ? "#e67e22" : "#27ae60";
@@ -543,7 +545,7 @@
     refreshLiveUI();
     runMaintenance();
 
-    // --- UPDATED: WEATHER FETCH LOGIC WITH PRECIPITATION ---
+    // --- UPDATED: WEATHER FETCH LOGIC WITH PRECIPITATION AND TEMPERATURE ---
         async function updateWeather() {
             try {
                 const hRes = await fetch('https://api.weather.gov/gridpoints/BOX/71,88/forecast/hourly');
@@ -584,12 +586,17 @@
                             icon = "☀️";
                         }
                         
-                        // NEW: Get Precipitation Probability
                         const pop = match.probabilityOfPrecipitation?.value || 0;
                         let popHtml = pop > 0 ? `<span style="font-size: 0.75rem; font-weight: bold; color: #3498db; margin-left: 4px;">${pop}%</span>` : '';
                         
                         const el = document.getElementById(`w-${slot}`);
                         if (el) el.innerHTML = icon + popHtml;
+
+                        // NEW: Update Temperature
+                        const tempEl = document.getElementById(`t-${slot}`);
+                        if (tempEl && match.temperature) {
+                            tempEl.innerText = `${match.temperature}°`;
+                        }
                     }
                 });
             } catch (e) {
@@ -611,3 +618,4 @@
 </script>
 </body>
 </html>
+
