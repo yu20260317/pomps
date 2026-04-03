@@ -587,7 +587,7 @@
                         }
                         
                         const pop = match.probabilityOfPrecipitation?.value || 0;
-                        let popHtml = pop > 0 ? `<span style="font-size: 0.75rem; font-weight: bold; color: #3498db; margin-left: 4px;">${pop}%</span>` : '';
+                        let popHtml = pop > 10 ? `<span style="font-size: 0.75rem; font-weight: bold; color: #3498db; margin-left: 4px;">${pop}%</span>` : '';
                         
                         const el = document.getElementById(`w-${slot}`);
                         if (el) el.innerHTML = icon + popHtml;
