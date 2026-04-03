@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,25 +18,19 @@
         .minus { background-color: #e74c3c; color: white; }
         #loyaltyBadge { font-size: 0.9rem; color: #e67e22; font-weight: bold; margin-bottom: 10px; display: none; }
         #status { font-size: 0.8rem; color: #7f8c8d; margin-top: 10px; margin-bottom: 15px; }
-        #announcementBar {
-            background: #ecf0f1;
-            color: #2c3e50;
-            padding: 12px;
-            border-radius: 10px;
-            margin: 0 auto 20px auto; /* Added auto to center it */
-            max-width: 400px;         /* Added to match the rest of the app */
+        #announcementBar {background: #ecf0f1;color: #2c3e50;padding: 12px;border-radius: 10px;
+            margin: 0 auto 20px auto;
+            max-width: 400px;
             display: none;
             border: 1px solid #dcdde1;
             text-align: left;
             white-space: pre-wrap;
         }
-        /* ADDED: position: relative; to time-tile so the weather icon stays inside it */
         .time-tile { cursor: pointer; transition: transform 0.1s active, background-color 0.2s; -webkit-tap-highlight-color: transparent; border: 2px solid transparent; padding: 10px; border-radius: 12px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; }
         .time-tile:active { transform: scale(0.92); }
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
         
-        /* ADDED: Style for the weather icon in the corner */
-        .slot-weather { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; }
+        .slot-weather { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; display: flex; align-items: center; }
 
         /* New Pro Styles */
         .pro-share-box {
@@ -48,14 +43,6 @@
         .share-btn {
             background-color: #9b59b6; color: white; width: 80%; font-weight: bold;
         }
-        .app-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;
-        }
-        .app-btn {
-            font-size: 0.9rem; padding: 10px; border-radius: 8px; color: white; font-weight: bold;
-        }
-        .wechat { background-color: #07C160; }
-        .teamreach { background-color: #34495e; }
     </style>
 </head>
 <body>
@@ -129,6 +116,7 @@
             <p style="font-size: 0.8rem; color: #7f8c8d; font-weight: bold; text-transform: uppercase;">Who's coming:</p>
             <div id="playerList" style="font-size: 0.9rem; color: #2c3e50;">
                 <p style="color: #bdc3c7; font-style: italic;">Tap a time slot to see the crew!</p>
+                <p style="color: #bdc3c7; font-style: italic;">Weather Forecast source: api.weather.gov</p>
             </div>
         </div>
         <div style="margin-top: 20px; padding-bottom: 40px;">
@@ -149,7 +137,7 @@
                 <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">Live Count: <span id="proCountDisplay" style="color: #e74c3c;">...</span></h2>
                 
                 <div style="margin-bottom: 15px;">
-                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 Player</button> Player</button>
+                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 Player</button>
                     <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1 Player</button>
                 </div>
                 <textarea id="msgInput" placeholder="Announcement... (Press Enter for new line)" style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
@@ -158,11 +146,6 @@
                 <button onclick="clearAnnouncement()" style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
                 <div class="pro-share-box">
                     <button class="share-btn" onclick="copyStatusToClipboard()">📋 Copy Hype Message</button>
-                    
-                    <div class="app-grid">
-                        <button class="app-btn wechat" onclick="window.location.href='weixin://'">Open WeChat</button>
-                        <button class="app-btn teamreach" onclick="window.location.href='teamreach://'">TeamReach</button>
-                    </div>
                 </div>
                 <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
                     System: Last Daily Wipe at ...
@@ -175,7 +158,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     // --- 1. INITIALIZATION & CONFIG ---
-    // Production Project: pickleball-tracker-480a7
     const app = initializeApp({
         apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
         authDomain: "pickleball-tracker-dev.firebaseapp.com",
@@ -192,26 +174,24 @@
     });
         
     const docRef = doc(db, "counts", "court_1");
-    const EXPIRY_TIME = 1000 * 60 * 60 * 2; // 2 Hours for Live tickets
-    // Identity Management: Keep users consistent across visits
+    const EXPIRY_TIME = 1000 * 60 * 60 * 2;
     let myPlayerId = localStorage.getItem('pickleball_player_id') || 'p_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('pickleball_player_id', myPlayerId);
     let currentCommitId = null;
+
     // --- 2. SHARED UI LOGIC ---
     window.showPage = (page) => {
             document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
             document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
             
-            // ADDED: Control the visibility of the new Pro page
             const proPage = document.getElementById('proPage');
             if (proPage) proPage.style.display = (page === 'pro') ? 'block' : 'none';
             document.getElementById('tabLive').classList.toggle('active', page === 'live');
             document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
             
-            // ADDED: Highlight the Pro tab when active
             const tabPro = document.getElementById('tabPro');
             if (tabPro) tabPro.classList.toggle('active', page === 'pro');
-            // --- NEW: Dynamically stamp Today/Tomorrow on the tiles ---
+
             if (page === 'commitment') {
                 const currentHour = new Date().getHours();
                 const slotEndTimes = { "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22 };
@@ -219,12 +199,11 @@
                 for (const [slot, endHour] of Object.entries(slotEndTimes)) {
                     const slotDiv = document.getElementById(`slot-${slot}`);
                     if (slotDiv) {
-                        const timeLabelDiv = slotDiv.children[2]; // Targets the "7a - 9a" text
+                        const timeLabelDiv = slotDiv.children[2];
                         const isTomorrow = currentHour >= endHour;
                         const dayText = isTomorrow ? "Tomorrow" : "Today";
-                        const badgeColor = isTomorrow ? "#e67e22" : "#27ae60"; // Orange for Tomorrow, Green for Today
+                        const badgeColor = isTomorrow ? "#e67e22" : "#27ae60";
                         
-                        // Clean old text and apply new day label
                         timeLabelDiv.innerHTML = timeLabelDiv.innerHTML.split(' <span')[0];
                         timeLabelDiv.innerHTML += ` <span style="color: ${badgeColor}; font-weight: bold;">(${dayText})</span>`;
                     }
@@ -232,7 +211,6 @@
             }
         };
     async function updateGlobalVisibility() {
-        // Toggle feature visibility based on ?dev=y flag
         const isDev = new URLSearchParams(window.location.search).get('dev') === 'y';
         document.getElementById('tabCommit').style.display = isDev ? 'block' : 'none';
         
@@ -242,33 +220,30 @@
         const savedName = localStorage.getItem('pickleball_nickname');
         if (savedName) document.getElementById('playerNickname').value = savedName;
     }
-    // --- 3. LIVE PAGE DOMAIN (Real-time Presence) ---
+
+    // --- 3. LIVE PAGE DOMAIN ---
     window.handleUpdate = async (val) => {
         const plusBtn = document.getElementById('plusBtn');
         if(plusBtn) plusBtn.disabled = true;
         try {
             if (val === 1) {
-                // MODIFIED: Fetch nickname for live Check-in or default to emoji
                 const nameInput = document.getElementById('playerNickname');
                 const name = nameInput.value.trim() || "anon.";
-                // Check-in: Create live ticket and increment counter
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(),
                     playerId: myPlayerId,
                     status: "live",
                     type: "play",
-                    displayName: name // Added displayName
+                    displayName: name
                 });
                 await updateDoc(docRef, { player_count: increment(1) });
                 
-                // Save name to local storage so they don't have to re-type it
                 localStorage.setItem('pickleball_nickname', name);
                 localStorage.setItem('pickleball_checkin_time', Date.now().toString());
                 
                 let visits = parseInt(localStorage.getItem('pickleball_visits') || '0') + 1;
                 localStorage.setItem('pickleball_visits', visits.toString());
             } else {
-                // Check-out: Find ticket, delete it, and decrement counter
                 const loginTime = localStorage.getItem('pickleball_checkin_time');
                 if (loginTime) {
                     const mins = Math.floor((Date.now() - parseInt(loginTime)) / 60000);
@@ -309,7 +284,8 @@
         if (visits >= 1) return "🛶 Pond Paddler";
         return "";
     }
-    // --- 4. COMMITMENT PAGE DOMAIN (Scheduling) ---
+
+    // --- 4. COMMITMENT PAGE DOMAIN ---
     let selectedTimeSlot = null;
     window.selectSlot = (slotId) => {
         document.querySelectorAll('.time-tile').forEach(t => t.classList.remove('selected'));
@@ -338,7 +314,7 @@
             snap.forEach(doc => {
                 const data = doc.data();
                 const isMe = data.playerId === myPlayerId ? " (You)" : "";
-                html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;">🏃🏻‍ <b>${data.displayName}</b>${isMe}</li>`;
+                html += `<li style="padding:10px 0; border-bottom:1px solid #f9f9f9;"> <b>${data.displayName}</b>${isMe}</li>`;
             });
             html += '</ul>';
             rosterEl.innerHTML = html;
@@ -349,14 +325,13 @@
                 const name = nameInput.value.trim() || "🏃🏻‍";
                 
                 if (!selectedTimeSlot) {
-                    alert("Please 'dip your finger' on a time slot first! 🏃🏻‍");
+                    alert("Please 'dip your finger' on a time slot first!");
                     return;
                 }
                 const btn = document.getElementById('commitBtn');
                 btn.disabled = true;
                 btn.innerText = "Saving...";
                 try {
-                    // --- NEW LOGIC: Today vs. Tomorrow ---
                     const now = new Date();
                     const currentHour = now.getHours();
                     const slotEndTimes = {
@@ -365,7 +340,6 @@
                     
                     let commitDate = now;
                     
-                    // If the time slot is already over for today, shift the date to tomorrow
                     if (currentHour >= slotEndTimes[selectedTimeSlot]) {
                         commitDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
                     }
@@ -375,7 +349,7 @@
                         timeSlot: selectedTimeSlot,
                         status: "scheduled",
                         createdAt: Timestamp.now(),
-                        date: commitDate.toDateString() // Now saves the correct day!
+                        date: commitDate.toDateString()
                     });
                     
                     localStorage.setItem('pickleball_nickname', name);
@@ -400,14 +374,14 @@
             } catch (e) { console.error("Withdrawal failed:", e); }
         }
     };
-    // --- 5. ADMIN & SYSTEM MAINTENANCE (The Janitor) ---
+
+    // --- 5. ADMIN & SYSTEM MAINTENANCE ---
     const runMaintenance = async () => {
         const todayStr = new Date().toDateString();
         const now = new Date();
         const currentHour = now.getHours();
         
         try {
-            // --- A. THE MORNING RESET ---
             await runTransaction(db, async (t) => {
                 const courtSnap = await t.get(docRef);
                 if (!courtSnap.exists()) return;
@@ -423,7 +397,6 @@
                     liveSnap.forEach(d => t.delete(d.ref));
                 }
             });
-            // --- B. THE GHOST SWEEP (2-Hour Live Expiry) ---
             const liveExpiry = Timestamp.fromMillis(Date.now() - EXPIRY_TIME);
             const ghostQuery = query(collection(db, "tickets"), where("createdAt", "<", liveExpiry), where("status", "==", "live"));
             const ghostSnap = await getDocs(ghostQuery);
@@ -434,7 +407,6 @@
                     t.update(docRef, { player_count: Math.max(0, (countSnap.data().player_count || 0) - ghostSnap.size) });
                 });
             }
-            // --- C. PRECISION SCHEDULE PURGE ---
             const slotEndTimes = {
                 "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22
             };
@@ -458,7 +430,6 @@
             const bar = document.getElementById('announcementBar');
             const announcement = bar.style.display === 'block' ? `\nNote: ${bar.innerText.replace('💬 ', '')}` : '';
             
-            // Customize your hype message here!
             const textToCopy = `🎾 Pomps Pond Update:\nThere are currently ${currentCount} players on the court!${announcement}\nCheck the live tracker: ${window.location.origin}${window.location.pathname}`;
             try {
                 await navigator.clipboard.writeText(textToCopy);
@@ -475,11 +446,12 @@
                 alert("Oops, couldn't copy automatically. Here is the text: \n\n" + textToCopy);
             }
         };
-    // PRO CONTROL: Manual adjustment logic
     window.proAdjust = async (val) => {
+        const nameInput = document.getElementById('playerNickname');
+        const name = nameInput.value.trim() || "manager";
         try {
             if (val === 1) {
-                const guestId = "manager_guest_" + Math.random().toString(36).substr(2, 5);
+                const guestId = name + "_guest_" + Math.random().toString(36).substr(2, 5);
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
                 });
@@ -504,6 +476,7 @@
         document.getElementById('msgInput').value = "";
     };
     window.clearAnnouncement = () => updateDoc(docRef, { announcement: "" });
+
     // --- 6. LISTENERS ---
     onSnapshot(docRef, (snap) => {
         if (!snap.exists()) return;
@@ -512,7 +485,6 @@
         
         document.getElementById('count').innerText = safeCount;
         
-        // ADD THIS: Update the Pro tab's mini-display too
         const proCountEl = document.getElementById('proCountDisplay');
         if (proCountEl) proCountEl.innerText = safeCount;
                 
@@ -525,7 +497,7 @@
         const resetEl = document.getElementById('resetStatus');
         if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
     });
-    // Toggle Withdraw button if user has a scheduled game
+    
     onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
         const commitBtn = document.getElementById('commitBtn');
         const withdrawBtn = document.getElementById('withdrawBtn');
@@ -539,7 +511,7 @@
             if(withdrawBtn) withdrawBtn.style.display = 'none';
         }
     });
-    // NEW LISTENER: Real-time update for "Who is Live"
+    
     onSnapshot(query(collection(db, "tickets"), where("status", "==", "live")), (snap) => {
         const rosterEl = document.getElementById('livePlayerRoster');
         if (rosterEl) {
@@ -563,18 +535,17 @@
         }
     });
     if (new URLSearchParams(window.location.search).get('role') === 'pro') {
-        // CHANGED: Unhide the new Pro tab instead of the old admin div inline
         document.getElementById('tabPro').style.display = 'block';
         document.body.style.backgroundColor = "#e1f5fe";
     }
+
     updateGlobalVisibility();
     refreshLiveUI();
     runMaintenance();
 
-    // --- UPDATED: WEATHER FETCH LOGIC ---
+    // --- UPDATED: WEATHER FETCH LOGIC WITH PRECIPITATION ---
         async function updateWeather() {
             try {
-                // Hourly Icons for Commitment Slots (Andover MA Gridpoints)
                 const hRes = await fetch('https://api.weather.gov/gridpoints/BOX/71,88/forecast/hourly');
                 const hData = await hRes.json();
                 const hours = hData.properties.periods;
@@ -587,7 +558,6 @@
                 Object.entries(slotHours).forEach(([slot, targetH]) => {
                     let targetDate = new Date();
                     
-                    // Exactly matches the label logic: if the slot is over, show tomorrow's weather
                     if (currentHour >= slotEnds[slot]) {
                         targetDate.setDate(targetDate.getDate() + 1);
                     }
@@ -596,9 +566,8 @@
                     const match = hours.find(h => new Date(h.startTime).getTime() === targetDate.getTime());
                     if (match) {
                         const lowerForecast = match.shortForecast.toLowerCase();
-                        let icon = "⛅"; // Default to Partly Cloudy/Sunny
+                        let icon = "⛅";
                         
-                        // Smarter phrase matching
                         if (lowerForecast.includes("rain") || lowerForecast.includes("shower") || lowerForecast.includes("drizzle")) {
                             icon = "🌧️";
                         } else if (lowerForecast.includes("snow") || lowerForecast.includes("flurries")) {
@@ -610,13 +579,17 @@
                         } else if (lowerForecast.includes("mostly cloudy") || lowerForecast === "cloudy") {
                             icon = "☁️";
                         } else if (lowerForecast.includes("partly") || lowerForecast.includes("mostly clear")) {
-                            icon = "⛅"; // Catches "Partly Sunny" and "Partly Cloudy"
+                            icon = "⛅";
                         } else if (lowerForecast.includes("sun") || lowerForecast.includes("clear")) {
-                            icon = "☀️"; // Only for pure "Sunny" or "Clear"
+                            icon = "☀️";
                         }
                         
+                        // NEW: Get Precipitation Probability
+                        const pop = match.probabilityOfPrecipitation?.value || 0;
+                        let popHtml = pop > 0 ? `<span style="font-size: 0.75rem; font-weight: bold; color: #3498db; margin-left: 4px;">${pop}%</span>` : '';
+                        
                         const el = document.getElementById(`w-${slot}`);
-                        if (el) el.innerText = icon;
+                        if (el) el.innerHTML = icon + popHtml;
                     }
                 });
             } catch (e) {
@@ -624,7 +597,7 @@
             }
         }
     updateWeather();
-    setInterval(updateWeather, 1000 * 60 * 15); // Auto-refresh weather every 15 minutes
+    setInterval(updateWeather, 1000 * 60 * 15);
 
     // --- 7. AUTO CHECK-IN LOGIC ---
     if (new URLSearchParams(window.location.search).get('action') === 'checkin') {
