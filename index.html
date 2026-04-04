@@ -41,8 +41,13 @@
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
         }
         .share-btn {
-            background-color: #9b59b6; color: white; width: 80%; font-weight: bold;
-        }
+                    background-color: #f8f9fa;
+                    color: #7f8c8d;
+                    border: 1px solid #bdc3c7;
+                    width: auto;
+                    font-size: 0.9rem;
+                    padding: 8px 15px;
+                }
     </style>
 </head>
 <body>
@@ -58,7 +63,7 @@
             
             <h1 id="count">...</h1>
             
-            <p id="manualUpdateDisplay" style="font-size: 0.8rem; color: #e67e22; margin-top: -10px; margin-bottom: 15px; display: none; font-weight: bold;"></p>
+            <p id="manualUpdateDisplay" style="font-size: 0.8rem; color: #22e67e; margin-top: -10px; margin-bottom: 15px; display: none; font-weight: bold;"></p>
             
             <input type="text" id="playerNickname" placeholder="Your Nickname..."
                    style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 1px;">
@@ -149,7 +154,7 @@
                 <button onclick="sendAnnouncement()" style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
                 <button onclick="clearAnnouncement()" style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
                 <div class="pro-share-box">
-                    <button class="share-btn" onclick="copyStatusToClipboard()">📋 Copy Hype Message</button>
+                    <button class="share-btn" onclick="copyStatusToClipboard()">📋 Generate Message</button>
                 </div>
                 <p id="resetStatus" style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
                     System: Last Daily Wipe at ...
@@ -430,64 +435,69 @@
         } catch (e) { console.error("Janitor error:", e); }
     };
         window.copyStatusToClipboard = async () => {
-            const currentCount = document.getElementById('count').innerText;
-            const bar = document.getElementById('announcementBar');
-            const announcement = bar.style.display === 'block' ? `\nNote: ${bar.innerText.replace('💬 ', '')}` : '';
-            
-            const textToCopy = `🎾 Pomps Pond Update:\nThere are currently ${currentCount} players on the court!${announcement}\nCheck the live tracker: ${window.location.origin}${window.location.pathname}`;
-            try {
-                await navigator.clipboard.writeText(textToCopy);
-                const btn = document.querySelector('.share-btn');
-                const originalText = btn.innerText;
-                btn.innerText = "✅ Copied to Clipboard!";
-                btn.style.backgroundColor = "#27ae60";
+                const currentCount = document.getElementById('count').innerText;
+                const bar = document.getElementById('announcementBar');
+                const announcement = bar.style.display === 'block' ? `\nNote: ${bar.innerText.replace('💬 ', '')}` : '';
                 
-                setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.style.backgroundColor = "#9b59b6";
-                }, 2000);
-            } catch (err) {
-                alert("Oops, couldn't copy automatically. Here is the text: \n\n" + textToCopy);
-            }
-        };
-    window.proAdjust = async (val) => {
-        const nameInput = document.getElementById('playerNickname');
-        const name = nameInput.value.trim() || "manager";
-        try {
-            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const currentMs = Date.now(); // ADDED: Record exact millisecond timestamp
-
-            if (val === 1) {
-                const guestId = name + "_guest_" + Math.random().toString(36).substr(2, 5);
-                await addDoc(collection(db, "tickets"), {
-                    createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
-                });
-                // ADDED: Save both the readable string and the exact millisecond time
-                await updateDoc(docRef, {
-                    player_count: increment(1),
-                    last_manual_update: timeString,
-                    last_manual_update_ms: currentMs
-                });
-            } else {
-                const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
-                const manualSnap = await getDocs(manualQ);
-                const targetDoc = !manualSnap.empty ? manualSnap.docs[0] : (await getDocs(query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1)))).docs[0];
+                // ADDED: Insert the current weather if available
+                const weatherText = window.currentWeatherInfo ? `\n🌤️ Current Weather: \n${window.currentWeatherInfo}\n` : '';
                 
-                if (targetDoc) {
-                    await runTransaction(db, async (t) => {
-                        t.delete(targetDoc.ref);
-                        // ADDED: Save both the readable string and the exact millisecond time
-                        t.update(docRef, {
-                            player_count: increment(-1),
-                            last_manual_update: timeString,
-                            last_manual_update_ms: currentMs
-                        });
-                    });
+                const textToCopy = `🎾 Pomps Pond Update:\nThere are currently ${currentCount} players on the court!${announcement}${weatherText}\nCheck the live tracker: ${window.location.origin}${window.location.pathname}`;
+                try {
+                    await navigator.clipboard.writeText(textToCopy);
+                    const btn = document.querySelector('.share-btn');
+                    const originalText = btn.innerText;
+                    btn.innerText = "✅ Copied!";
+                    btn.style.backgroundColor = "#27ae60";
+                    btn.style.color = "white"; // Make text white during success state
+                    
+                    setTimeout(() => {
+                        btn.innerText = originalText;
+                        btn.style.backgroundColor = "#f8f9fa";
+                        btn.style.color = "#7f8c8d"; // Revert to muted colors
+                    }, 2000);
+                } catch (err) {
+                    alert("Oops, couldn't copy automatically. Here is the text: \n\n" + textToCopy);
                 }
-            }
-        } catch (e) { console.error("Pro Adjust failed:", e); }
-    };
-    window.sendAnnouncement = () => {
+            };
+        window.proAdjust = async (val) => {
+                const nameInput = document.getElementById('playerNickname');
+                const name = nameInput.value.trim() || "manager";
+                try {
+                    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const currentMs = Date.now();
+
+                    if (val === 1) {
+                        // Add a manual ticket
+                        const guestId = name + "_guest_" + Math.random().toString(36).substr(2, 5);
+                        await addDoc(collection(db, "tickets"), {
+                            createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
+                        });
+                    } else {
+                        // Find and remove the target ticket
+                        const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
+                        const manualSnap = await getDocs(manualQ);
+                        const targetDoc = !manualSnap.empty ? manualSnap.docs[0] : (await getDocs(query(collection(db, "tickets"), orderBy("createdAt", "asc"), limit(1)))).docs[0];
+                        
+                        if (targetDoc) {
+                            await deleteDoc(targetDoc.ref);
+                        }
+                    }
+
+                    // RECONCILIATION: Fetch all currently live tickets to get the "Truth"
+                    const allLiveQuery = query(collection(db, "tickets"), where("status", "==", "live"));
+                    const allLiveSnap = await getDocs(allLiveQuery);
+                    const trueCount = allLiveSnap.size;
+
+                    // Overwrite the player_count with the reconciled number
+                    await updateDoc(docRef, {
+                        player_count: trueCount,
+                        last_manual_update: timeString,
+                        last_manual_update_ms: currentMs
+                    });
+
+                } catch (e) { console.error("Pro Adjust reconciliation failed:", e); }
+            };    window.sendAnnouncement = () => {
         const msg = document.getElementById('msgInput').value;
         if (msg) updateDoc(docRef, { announcement: msg });
         document.getElementById('msgInput').value = "";
@@ -521,10 +531,13 @@
                 // 2 hours = 7,200,000 milliseconds
                 const twoHoursMs = 2 * 60 * 60 * 1000;
                 const isRecent = (Date.now() - data.last_manual_update_ms) < twoHoursMs;
+                const nameInput = document.getElementById('playerNickname');
+                const name = nameInput.value.trim() || "a player";
+
                 
                 if (isRecent) {
                     manualUpdateEl.style.display = 'block';
-                    manualUpdateEl.innerText = `Last manually adjusted at: ${data.last_manual_update}`;
+                    manualUpdateEl.innerText = `Verified at: ${data.last_manual_update} by ${name}`;
                 } else {
                     manualUpdateEl.style.display = 'none'; // Hide if older than 2 hours
                 }
@@ -594,7 +607,9 @@
                 const slotEnds = { "0700": 9, "0900": 11, "1100": 14, "1400": 16, "1600": 18, "1800": 22 };
                 const now = new Date();
                 const currentHour = now.getHours();
-
+                if (hours && hours.length > 0) {
+                            window.currentWeatherInfo = `${hours[0].temperature}°F, ${hours[0].shortForecast}`;
+                        }
                 Object.entries(slotHours).forEach(([slot, targetH]) => {
                     let targetDate = new Date();
                     
