@@ -31,10 +31,8 @@
         .time-tile.selected { border: 2px solid #3498db !important; background-color: #ebf5ff !important; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.15); }
         
         .slot-weather { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; display: flex; align-items: center; }
-        /* ADDED: Style for the temperature in the top left corner */
         .slot-temp { position: absolute; top: 5px; left: 8px; font-size: 0.85rem; font-weight: bold; color: #7f8c8d; }
 
-        /* New Pro Styles */
         .pro-share-box {
             margin-top: 20px;
             padding: 15px;
@@ -59,6 +57,9 @@
             <h3 style="color: #4444ff;">Players at Pomps Pond</h3>
             
             <h1 id="count">...</h1>
+            
+            <p id="manualUpdateDisplay" style="font-size: 0.8rem; color: #e67e22; margin-top: -10px; margin-bottom: 15px; display: none; font-weight: bold;"></p>
+            
             <input type="text" id="playerNickname" placeholder="Your Nickname..."
                    style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 1px;">
             <div id="loyaltyBadge"></div>
@@ -142,6 +143,7 @@
                     <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1 Player</button>
                     <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1 Player</button>
                 </div>
+                
                 <textarea id="msgInput" placeholder="Announcement... (Press Enter for new line)" style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
                 <br>
                 <button onclick="sendAnnouncement()" style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
@@ -452,12 +454,20 @@
         const nameInput = document.getElementById('playerNickname');
         const name = nameInput.value.trim() || "manager";
         try {
+            const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const currentMs = Date.now(); // ADDED: Record exact millisecond timestamp
+
             if (val === 1) {
                 const guestId = name + "_guest_" + Math.random().toString(36).substr(2, 5);
                 await addDoc(collection(db, "tickets"), {
                     createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
                 });
-                await updateDoc(docRef, { player_count: increment(1) });
+                // ADDED: Save both the readable string and the exact millisecond time
+                await updateDoc(docRef, {
+                    player_count: increment(1),
+                    last_manual_update: timeString,
+                    last_manual_update_ms: currentMs
+                });
             } else {
                 const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
                 const manualSnap = await getDocs(manualQ);
@@ -466,7 +476,12 @@
                 if (targetDoc) {
                     await runTransaction(db, async (t) => {
                         t.delete(targetDoc.ref);
-                        t.update(docRef, { player_count: increment(-1) });
+                        // ADDED: Save both the readable string and the exact millisecond time
+                        t.update(docRef, {
+                            player_count: increment(-1),
+                            last_manual_update: timeString,
+                            last_manual_update_ms: currentMs
+                        });
                     });
                 }
             }
@@ -498,6 +513,29 @@
         
         const resetEl = document.getElementById('resetStatus');
         if (resetEl && data.last_reset_time) resetEl.innerText = `System: Last Daily Wipe at ${data.last_reset_time}`;
+
+        // UPDATED: Logic to hide the manual timestamp if it's older than 2 hours
+        const manualUpdateEl = document.getElementById('manualUpdateDisplay');
+        if (manualUpdateEl && data.last_manual_update) {
+            if (data.last_manual_update_ms) {
+                // 2 hours = 7,200,000 milliseconds
+                const twoHoursMs = 2 * 60 * 60 * 1000;
+                const isRecent = (Date.now() - data.last_manual_update_ms) < twoHoursMs;
+                
+                if (isRecent) {
+                    manualUpdateEl.style.display = 'block';
+                    manualUpdateEl.innerText = `Last manually adjusted at: ${data.last_manual_update}`;
+                } else {
+                    manualUpdateEl.style.display = 'none'; // Hide if older than 2 hours
+                }
+            } else {
+                // Fallback for right after you upload this code, before the very first click
+                manualUpdateEl.style.display = 'block';
+                manualUpdateEl.innerText = `Last manually adjusted at: ${data.last_manual_update}`;
+            }
+        } else if (manualUpdateEl) {
+            manualUpdateEl.style.display = 'none';
+        }
     });
     
     onSnapshot(query(collection(db, "tickets"), where("playerId", "==", myPlayerId), where("status", "==", "scheduled")), (snap) => {
@@ -592,7 +630,6 @@
                         const el = document.getElementById(`w-${slot}`);
                         if (el) el.innerHTML = icon + popHtml;
 
-                        // NEW: Update Temperature
                         const tempEl = document.getElementById(`t-${slot}`);
                         if (tempEl && match.temperature) {
                             tempEl.innerText = `${match.temperature}°`;
@@ -618,4 +655,3 @@
 </script>
 </body>
 </html>
-
