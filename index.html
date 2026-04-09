@@ -191,11 +191,11 @@
             <h1 id="count">...</h1>
 
             <p id="manualUpdateDisplay"
-                style="font-size: 0.8rem; color: #22e67e; margin-top: -10px; margin-bottom: 15px; display: none; font-weight: bold;">
+               style="font-size: 0.8rem; color: #22e67e; margin-top: -10px; margin-bottom: 15px; display: none; font-weight: bold;">
             </p>
 
             <input type="text" id="playerNickname" placeholder="Your Nickname..."
-                style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 1px;">
+                   style="width: 85%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; margin-bottom: 1px;">
             <div id="loyaltyBadge"></div>
 
             <div id="checkInArea">
@@ -209,16 +209,16 @@
             <div id="status">Connecting to the Pond...</div>
 
             <div style="margin-top: 20px; margin-bottom: 15px;">
-                <p
-                    style="font-size: 0.8rem; color: #27ae60; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">
-                    🎾 On The Court</p>
+                <p style="font-size: 0.8rem; color: #27ae60; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">
+                    🎾 On The Court
+                </p>
                 <div id="livePlayerRoster"
-                    style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; min-height: 50px; max-height: 150px; overflow-y: auto; background-color: #e9f7ef; border: 2px solid #27ae60; border-radius: 12px; padding: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                     style="display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; min-height: 50px; max-height: 150px; overflow-y: auto; background-color: #e9f7ef; border: 2px solid #27ae60; border-radius: 12px; padding: 15px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div id="logPage" style="display: none; padding: 10px;">
         <div class="counter-box" style="margin: 0 auto;">
             <h3 style="color: #2c3e50;">Past 7 Days Activity</h3>
@@ -269,8 +269,9 @@
         </div>
 
         <div id="rosterArea"
-            style="text-align: left; padding: 20px 10px; margin-top: 20px; background: white; border-radius: 15px;">
-            <p style="font-size: 0.8rem; color: #7f8c8d; font-weight: bold; text-transform: uppercase;">Who's coming:
+             style="text-align: left; padding: 20px 10px; margin-top: 20px; background: white; border-radius: 15px;">
+            <p style="font-size: 0.8rem; color: #7f8c8d; font-weight: bold; text-transform: uppercase;">
+                Who's coming:
             </p>
             <div id="playerList" style="font-size: 0.9rem; color: #2c3e50;">
                 <p style="color: #bdc3c7; font-style: italic;">Tap a time slot to see the crew!</p>
@@ -279,11 +280,11 @@
         </div>
         <div style="margin-top: 20px; padding-bottom: 40px;">
             <button id="commitBtn" class="plus" onclick="submitCommitment()"
-                style="margin-top: 15px; background: #3498db;">
+                    style="margin-top: 15px; background: #3498db;">
                 + I'll Be There
             </button>
             <button id="withdrawBtn" onclick="withdrawCommitment()"
-                style="display:none; width: 100%; background:none; color:#e74c3c; font-size: 0.9rem; font-weight: bold; text-decoration: underline; border:none; margin-top: 15px; cursor: pointer;">
+                    style="display:none; width: 100%; background:none; color:#e74c3c; font-size: 0.9rem; font-weight: bold; text-decoration: underline; border:none; margin-top: 15px; cursor: pointer;">
                 ❌ I can't make it anymore (Withdraw)
             </button>
         </div>
@@ -293,37 +294,50 @@
             <div id="adminArea" style="display: block; margin-top: 0;">
                 <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
 
-                <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">Live Count: <span
-                        id="proCountDisplay" style="color: #e74c3c;">...</span></h2>
+                <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">
+                    Live Count: <span id="proCountDisplay" style="color: #e74c3c;">...</span>
+                </h2>
 
                 <div style="margin-bottom: 15px;">
-                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1
-                        Player</button>
-                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1
-                        Player</button>
+                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">
+                        +1
+                        Player
+                    </button>
+                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">
+                        -1
+                        Player
+                    </button>
                 </div>
 
                 <textarea id="msgInput" placeholder="Announcement... (Press Enter for new line)"
-                    style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
+                          style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
                 <br>
                 <button onclick="sendAnnouncement()"
-                    style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
+                        style="padding: 8px 15px; background: #27ae60; color: white;">
+                    Post
+                </button>
                 <button onclick="clearAnnouncement()"
-                    style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
+                        style="padding: 8px 15px; background: #95a5a6; color: white;">
+                    Clear
+                </button>
                 <div class="pro-share-box">
                     <button class="share-btn" onclick="copyStatusToClipboard()">📋 Generate Message</button>
                 </div>
                 <p id="resetStatus"
-                    style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
+                   style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
                     System: Last Daily Wipe at ...
                 </p>
             </div>
         </div>
     </div>
 
+    <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
+        <p style="font-size: 0.75rem; color: #bdc3c7;">DPV: <span id="visitorCountDisplay">...</span></p>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch, setDoc} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         // --- 1. INITIALIZATION & CONFIG ---
         const app = initializeApp({
             apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
@@ -354,7 +368,7 @@
 
             const proPage = document.getElementById('proPage');
             if (proPage) proPage.style.display = (page === 'pro') ? 'block' : 'none';
-            
+
             document.getElementById('tabLive').classList.toggle('active', page === 'live');
             document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
             document.getElementById('tabLog').classList.toggle('active', page === 'log'); // NEW: Make log tab active
@@ -407,7 +421,7 @@
                         displayName: name
                     });
                     await updateDoc(docRef, { player_count: increment(1) });
-                    
+
                     // NEW: Log it to the permanent daily scorecard
                     const todayStr = new Date().toDateString();
                     await setDoc(doc(db, "daily_stats", todayStr), {
@@ -466,23 +480,23 @@
         window.loadWeeklyLog = async () => {
             const logList = document.getElementById('weekly-log-list');
             logList.innerHTML = '<li style="color: #7f8c8d; text-align: center;">Loading activity...</li>';
-            
+
             try {
                 const q = query(collection(db, "daily_stats"), orderBy("timestamp", "desc"), limit(7));
                 const snap = await getDocs(q);
-                
+
                 if (snap.empty) {
                     logList.innerHTML = '<li style="color: #bdc3c7; text-align: center; font-style: italic;">No activity recorded yet.</li>';
                     return;
                 }
-                
+
                 let html = '';
                 snap.forEach(doc => {
                     const data = doc.data();
                     html += `<li style="padding: 12px 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: bold; color: #2c3e50;">${doc.id}</span>
-                        <span style="color: #27ae60; font-weight: bold; background: #e9f7ef; padding: 4px 10px; border-radius: 10px;">${data.checkins} players</span>
-                    </li>`;
+                            <span style="font-weight: bold; color: #2c3e50;">${doc.id}</span>
+                            <span style="color: #27ae60; font-weight: bold; background: #e9f7ef; padding: 4px 10px; border-radius: 10px;">${data.checkins} players</span>
+                        </li>`;
                 });
                 logList.innerHTML = html;
             } catch (e) {
@@ -869,6 +883,26 @@
                 }
             }, 1000);
         }
+
+        // --- 8. DAILY VISITOR COUNTER ---
+        const todayStrForVisit = new Date().toDateString();
+        const dailyStatRef = doc(db, "daily_stats", todayStrForVisit);
+
+        // 1. Add +1 to today's visits every time the page loads
+        setDoc(dailyStatRef, {
+            visits: increment(1),
+            timestamp: Timestamp.now()
+        }, { merge: true }).catch(e => console.error("Visit count error:", e));
+
+        // 2. Listen to today's document to display the live visit count
+        onSnapshot(dailyStatRef, (snap) => {
+            const el = document.getElementById('visitorCountDisplay');
+            if (el && snap.exists()) {
+                el.innerText = snap.data().visits || 1;
+            } else if (el) {
+                el.innerText = "1";
+            }
+        });
     </script>
 </body>
 
