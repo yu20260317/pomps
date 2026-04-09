@@ -294,32 +294,23 @@
             <div id="adminArea" style="display: block; margin-top: 0;">
                 <p style="color: #2980b9; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem;">👑 PRO CONTROL</p>
 
-                <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">
-                    Live Count: <span id="proCountDisplay" style="color: #e74c3c;">...</span>
-                </h2>
+                <h2 style="margin: 0 0 15px 0; font-size: 1.5rem; color: #2c3e50;">Live Count: <span
+                        id="proCountDisplay" style="color: #e74c3c;">...</span></h2>
 
                 <div style="margin-bottom: 15px;">
-                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">
-                        +1
-                        Player
-                    </button>
-                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">
-                        -1
-                        Player
-                    </button>
+                    <button onclick="proAdjust(1)" style="background: #3498db; color: white; padding: 8px;">+1
+                        Player</button>
+                    <button onclick="proAdjust(-1)" style="background: #e67e22; color: white; padding: 8px;">-1
+                        Player</button>
                 </div>
 
                 <textarea id="msgInput" placeholder="Announcement... (Press Enter for new line)"
                           style="width:80%; padding:8px; margin-bottom:10px; font-family: inherit; resize: vertical; min-height: 60px;"></textarea>
                 <br>
                 <button onclick="sendAnnouncement()"
-                        style="padding: 8px 15px; background: #27ae60; color: white;">
-                    Post
-                </button>
+                    style="padding: 8px 15px; background: #27ae60; color: white;">Post</button>
                 <button onclick="clearAnnouncement()"
-                        style="padding: 8px 15px; background: #95a5a6; color: white;">
-                    Clear
-                </button>
+                    style="padding: 8px 15px; background: #95a5a6; color: white;">Clear</button>
                 <div class="pro-share-box">
                     <button class="share-btn" onclick="copyStatusToClipboard()">📋 Generate Message</button>
                 </div>
@@ -327,13 +318,14 @@
                    style="font-size: 0.7rem; color: #7f8c8d; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 5px;">
                     System: Last Daily Wipe at ...
                 </p>
+                <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
+                    <p style="font-size: 0.75rem; color: #bdc3c7;">vst: <span id="visitorCountDisplay">...</span></p>
+                </div>
             </div>
         </div>
     </div>
 
-    <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
-        <p style="font-size: 0.75rem; color: #bdc3c7;">DPV: <span id="visitorCountDisplay">...</span></p>
-    </div>
+  
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
