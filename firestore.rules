@@ -9,5 +9,11 @@ service cloud.firestore {
     match /tickets/{document=**} {
       allow read, write, delete: if true; // <--- The Janitor needs 'delete'!
     }
+// Allow anyone to read the daily stats (the log), 
+// but only the app can create or update them during a check-in.
+match /daily_stats/{date} {
+  allow read: if true;
+  allow write: if true; 
+}
   }
 }

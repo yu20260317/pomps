@@ -180,6 +180,7 @@
     <nav class="tab-bar">
         <button id="tabLive" class="tab-btn active" onclick="showPage('live')">📍 Live Now</button>
         <button id="tabCommit" class="tab-btn" onclick="showPage('commitment')">🤝 Commitment</button>
+        <button id="tabLog" class="tab-btn" onclick="showPage('log')">📊 Log</button>
         <button id="tabPro" class="tab-btn" onclick="showPage('pro')" style="display: none;">👑 Pro</button>
     </nav>
     <div id="announcementBar"></div>
@@ -217,6 +218,16 @@
             </div>
         </div>
     </div>
+    
+    <div id="logPage" style="display: none; padding: 10px;">
+        <div class="counter-box" style="margin: 0 auto;">
+            <h3 style="color: #2c3e50;">Past 7 Days Activity</h3>
+            <ul id="weekly-log-list" style="list-style-type: none; padding: 0; text-align: left; margin-top: 15px;">
+                <li style="color: #7f8c8d; text-align: center;">Loading activity...</li>
+            </ul>
+        </div>
+    </div>
+
     <div id="commitmentPage" style="display: none; padding: 10px;">
         <div class="time-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;">
             <div id="slot-0700" class="time-tile" onclick="selectSlot('0700')">
@@ -312,7 +323,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, increment, collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, runTransaction, deleteDoc, writeBatch, setDoc} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         // --- 1. INITIALIZATION & CONFIG ---
         const app = initializeApp({
             apiKey: "AIzaSyByiTa4KL2l1uw57z2MyFwr6flvezEinWQ",
@@ -339,14 +350,20 @@
         window.showPage = (page) => {
             document.getElementById('livePage').style.display = (page === 'live') ? 'block' : 'none';
             document.getElementById('commitmentPage').style.display = (page === 'commitment') ? 'block' : 'none';
+            document.getElementById('logPage').style.display = (page === 'log') ? 'block' : 'none'; // NEW: Hide/Show log page
 
             const proPage = document.getElementById('proPage');
             if (proPage) proPage.style.display = (page === 'pro') ? 'block' : 'none';
+            
             document.getElementById('tabLive').classList.toggle('active', page === 'live');
             document.getElementById('tabCommit').classList.toggle('active', page === 'commitment');
+            document.getElementById('tabLog').classList.toggle('active', page === 'log'); // NEW: Make log tab active
 
             const tabPro = document.getElementById('tabPro');
             if (tabPro) tabPro.classList.toggle('active', page === 'pro');
+
+            // NEW: Fetch weekly log data when the tab is opened
+            if (page === 'log') loadWeeklyLog();
 
             if (page === 'commitment') {
                 const currentHour = new Date().getHours();
@@ -366,7 +383,7 @@
                 }
             }
         };
-  async function updateGlobalVisibility() {
+        async function updateGlobalVisibility() {
             // Make the commitment tab permanently visible for all users
             document.getElementById('tabCommit').style.display = 'block';
 
@@ -390,6 +407,13 @@
                         displayName: name
                     });
                     await updateDoc(docRef, { player_count: increment(1) });
+                    
+                    // NEW: Log it to the permanent daily scorecard
+                    const todayStr = new Date().toDateString();
+                    await setDoc(doc(db, "daily_stats", todayStr), {
+                        checkins: increment(1),
+                        timestamp: Timestamp.now()
+                    }, { merge: true });
 
                     localStorage.setItem('pickleball_nickname', name);
                     localStorage.setItem('pickleball_checkin_time', Date.now().toString());
@@ -437,6 +461,35 @@
             if (visits >= 1) return "🛶 Pond Paddler";
             return "";
         }
+
+        // --- NEW: FETCH WEEKLY LOG FUNCTION ---
+        window.loadWeeklyLog = async () => {
+            const logList = document.getElementById('weekly-log-list');
+            logList.innerHTML = '<li style="color: #7f8c8d; text-align: center;">Loading activity...</li>';
+            
+            try {
+                const q = query(collection(db, "daily_stats"), orderBy("timestamp", "desc"), limit(7));
+                const snap = await getDocs(q);
+                
+                if (snap.empty) {
+                    logList.innerHTML = '<li style="color: #bdc3c7; text-align: center; font-style: italic;">No activity recorded yet.</li>';
+                    return;
+                }
+                
+                let html = '';
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    html += `<li style="padding: 12px 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: bold; color: #2c3e50;">${doc.id}</span>
+                        <span style="color: #27ae60; font-weight: bold; background: #e9f7ef; padding: 4px 10px; border-radius: 10px;">${data.checkins} players</span>
+                    </li>`;
+                });
+                logList.innerHTML = html;
+            } catch (e) {
+                console.error("Error loading log:", e);
+                logList.innerHTML = '<li style="color: #e74c3c; text-align: center;">Error loading data.</li>';
+            }
+        };
 
         // --- 4. COMMITMENT PAGE DOMAIN ---
         let selectedTimeSlot = null;
@@ -617,6 +670,14 @@
                     await addDoc(collection(db, "tickets"), {
                         createdAt: Timestamp.now(), playerId: guestId, status: "live", isManual: true
                     });
+
+                    const todayStr = new Date().toDateString();
+                    await setDoc(doc(db, "daily_stats", todayStr), {
+                        checkins: increment(1),
+                        timestamp: Timestamp.now()
+                    }, { merge: true });
+
+
                 } else {
                     // Find and remove the target ticket
                     const manualQ = query(collection(db, "tickets"), where("isManual", "==", true), orderBy("createdAt", "desc"), limit(1));
